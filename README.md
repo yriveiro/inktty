@@ -1,15 +1,29 @@
-# react
+# inktty
 
-To install dependencies:
+A simple terminal markdown reader built with OpenTUI.
 
-```bash
-bun install
-```
-
-To run:
+## Usage
 
 ```bash
-bun dev
+# Read a markdown file
+bun run bin/ink.tsx <path-to-file.md>
+
+# Development (watch mode)
+bun run dev
+
+# Run tests
+bun test
+bun run test:bdd
+
+# Lint and format
+bun run lint
+bun run lint:fix
 ```
 
-This project was created using `bun create tui`. [create-tui](https://git.new/create-tui) is the easiest way to get started with OpenTUI.
+## Example
+
+```bash
+bun run bin/ink.tsx example.md
+```
+
+Press **q** to quit.

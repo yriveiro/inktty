@@ -1,20 +1,38 @@
 {
-  "name": "mdreader",
-  "module": "src/index.tsx",
+  "name": "inktty",
+  "version": "1.0.0",
+  "description": "A simple terminal markdown reader built with OpenTUI",
   "type": "module",
-  "private": true,
+  "bin": {
+    "ink": "./bin/ink.tsx"
+  },
   "scripts": {
-    "dev": "bun run --watch src/index.tsx"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
-  "peerDependencies": {
-    "typescript": "^5"
+    "start": "bun run bin/ink.tsx",
+    "dev": "bun --watch run bin/ink.tsx",
+    "test": "bun test",
+    "test:bdd": "bun test tests/bdd",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opentui/core": "^0.1.101",
-    "@opentui/react": "^0.1.101",
-    "react": "^19.2.4"
+    "@opentui/core": "0.1.102",
+    "@opentui/react": "0.1.102",
+    "@tree-sitter-grammars/tree-sitter-yaml": "^0.7.1",
+    "react": "^19.2.4",
+    "tree-sitter-bash": "^0.25.1",
+    "tree-sitter-java": "^0.23.5",
+    "tree-sitter-json": "^0.24.8",
+    "web-tree-sitter": "0.25.10"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.12",
+    "@types/bun": "latest",
+    "@types/react": "^19.2.4",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
   }
 }

@@ -48,6 +48,11 @@ export async function renderFrame(testSetup: TestSetup): Promise<string> {
 }
 
 export function emitKey(testSetup: TestSetup, name: string, sequence: string): void {
+  const shift =
+    sequence.length === 1 &&
+    sequence.toLowerCase() !== sequence &&
+    sequence.toUpperCase() === sequence;
+
   act(() => {
     testSetup.renderer.keyInput.emit(
       "keypress",
@@ -55,7 +60,7 @@ export function emitKey(testSetup: TestSetup, name: string, sequence: string): v
         name,
         sequence,
         ctrl: false,
-        shift: false,
+        shift,
         meta: false,
         option: false,
         eventType: "press",

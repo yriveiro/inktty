@@ -1,14 +1,19 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { App } from "../../src/App";
+import { getEmbeddedThemes } from "../../src/lib/theme";
 import { destroyTestSetup, pressKey, renderFrame, type TestSetup, testRender } from "../test-utils";
 
 let testSetup: TestSetup | undefined;
+const defaultThemes = getEmbeddedThemes();
 
 async function givenInkttyIsRendering(content: string, width = 80, height = 24) {
-  testSetup = await testRender(<App fileName="story.md" content={content} />, {
-    width,
-    height,
-  });
+  testSetup = await testRender(
+    <App fileName="story.md" content={content} themes={defaultThemes} />,
+    {
+      width,
+      height,
+    },
+  );
 
   return testSetup;
 }
@@ -61,16 +66,60 @@ describe("Package behavior", () => {
   });
 
   describe("Scenario: enabling line numbers in raw code view", () => {
-    test("Given the raw source view, when l is pressed, then each line is prefixed with a line number", async () => {
+    test("Given the raw source view, when n is pressed, then each line is prefixed with a line number", async () => {
       const setup = await givenInkttyIsRendering("# Heading\n\nBody");
 
       await renderFrame(setup);
       await pressKey(setup, "tab", "\t");
-      await pressKey(setup, "l");
+      await pressKey(setup, "n");
 
       const frame = await renderFrame(setup);
       expect(frame).toContain("1 | # Heading");
       expect(frame).toContain("3 | Body");
+    });
+  });
+
+  describe("Scenario: switching between soft wrap and horizontal scrolling", () => {
+    test("Given a long code line, when wrap is disabled, then h and l scroll horizontally instead of toggling line numbers", async () => {
+      const setup = await givenInkttyIsRendering(
+        "averylonglinewithoutspaces-1234567890-abcdefghij",
+        90,
+        12,
+      );
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      await pressKey(setup, "w");
+      await pressKey(setup, "/", "?");
+
+      const beforeScroll = await renderFrame(setup);
+      expect(beforeScroll).toContain("toggle wrap");
+      expect(beforeScroll).toContain("horizontal scroll");
+
+      await pressKey(setup, "escape", "\u001B");
+      await pressKey(setup, "l");
+      await pressKey(setup, "l");
+
+      const afterScroll = await renderFrame(setup);
+      expect(afterScroll).toContain("1234567890");
+      expect(afterScroll).not.toContain("lines: on");
+    });
+  });
+
+  describe("Scenario: rendering richer markdown affordances", () => {
+    test("Given enhanced markdown blocks, when inktty renders the parsed view, then headings, tasks, callouts, tables, and links get terminal-specific chrome", async () => {
+      const content = await Bun.file(
+        new URL("../fixtures/rich-markdown.md", import.meta.url),
+      ).text();
+      const setup = await givenInkttyIsRendering(content, 90, 28);
+
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("# Release Notes");
+      expect(frame).toContain("gh GitHub link");
+      expect(frame).toContain("[ ]");
+      expect(frame).toContain("[x]");
+      expect(frame).toContain("[NOTE] Terminal rendering");
+      expect(frame).toContain("Name < | Value >");
     });
   });
 });

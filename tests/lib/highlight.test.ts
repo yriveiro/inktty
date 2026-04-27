@@ -33,10 +33,8 @@ describe("highlight", () => {
   });
 
   test("keeps later bash commands highlighted after markdown placeholders", async () => {
-    const chunks = await highlightCode(
-      "bun run src/index.tsx <path-to-file.md>\nbun run dev",
-      "bash",
-    );
+    const source = "bun run src/index.tsx <path-to-file.md>\nbun run dev";
+    const chunks = await highlightCode(source, "bash");
 
     expect(
       chunks
@@ -45,6 +43,31 @@ describe("highlight", () => {
         .slice(0, 3),
     ).toEqual([224, 175, 104]);
     expect(chunks.some((chunk: HighlightChunk) => chunk.text.includes("bun run dev"))).toBe(false);
+    expect(chunks.map((chunk: HighlightChunk) => chunk.text).join("")).toBe(source);
+  });
+
+  test("keeps later bash commands highlighted after placeholders with spaces", async () => {
+    const source = "bun run <path to file.md>\nbun run dev";
+    const chunks = await highlightCode(source, "bash");
+
+    const bunChunks = chunks.filter((chunk: HighlightChunk) => chunk.text === "bun");
+
+    expect(bunChunks).toHaveLength(2);
+    expect(bunChunks.at(-1)?.fg?.toInts().slice(0, 3)).toEqual([224, 175, 104]);
+    expect(chunks.some((chunk: HighlightChunk) => chunk.text.includes("bun run dev"))).toBe(false);
+    expect(chunks.map((chunk: HighlightChunk) => chunk.text).join("")).toBe(source);
+  });
+
+  test("keeps later bash commands highlighted after placeholders with mixed quotes", async () => {
+    const source = 'bun run <path-with-"quote">\nbun run <path-with-"both\'quotes>\nbun run dev';
+    const chunks = await highlightCode(source, "bash");
+
+    const bunChunks = chunks.filter((chunk: HighlightChunk) => chunk.text === "bun");
+
+    expect(bunChunks).toHaveLength(3);
+    expect(bunChunks.at(-1)?.fg?.toInts().slice(0, 3)).toEqual([224, 175, 104]);
+    expect(chunks.some((chunk: HighlightChunk) => chunk.text.includes("bun run dev"))).toBe(false);
+    expect(chunks.map((chunk: HighlightChunk) => chunk.text).join("")).toBe(source);
   });
 
   test("resolves yaml, json, java, and rego fence languages", () => {

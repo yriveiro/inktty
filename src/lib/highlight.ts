@@ -8,6 +8,7 @@ import {
   type TreeSitterClient,
   treeSitterToTextChunks,
 } from "@opentui/core";
+import { defaultTheme, type InkTheme, type SyntaxPalette } from "./theme";
 
 const require = createRequire(import.meta.url);
 const bashHighlightQueryPath = require.resolve("tree-sitter-bash/queries/highlights.scm");
@@ -98,40 +99,48 @@ const fenceLanguageAliases: Record<string, string> = {
   "c++": "cpp",
 };
 
-export const syntaxStyle = SyntaxStyle.fromStyles({
-  default: { fg: color("#c0caf5") },
-  keyword: { fg: color("#7aa2f7"), bold: true },
-  "keyword.function": { fg: color("#7aa2f7"), bold: true },
-  "keyword.operator": { fg: color("#7aa2f7"), bold: true },
-  string: { fg: color("#9ece6a") },
-  "string.escape": { fg: color("#bb9af7") },
-  "string.special": { fg: color("#9ece6a") },
-  number: { fg: color("#ff9e64") },
-  constant: { fg: color("#ff9e64") },
-  "constant.builtin": { fg: color("#ff9e64") },
-  comment: { fg: color("#565f89"), italic: true },
-  function: { fg: color("#e0af68") },
-  "function.call": { fg: color("#e0af68") },
-  "function.method": { fg: color("#e0af68") },
-  "function.method.call": { fg: color("#e0af68") },
-  "function.builtin": { fg: color("#e0af68") },
-  type: { fg: color("#2ac3de") },
-  "type.builtin": { fg: color("#2ac3de") },
-  "type.definition": { fg: color("#2ac3de") },
-  property: { fg: color("#c0caf5") },
-  variable: { fg: color("#c0caf5") },
-  "variable.builtin": { fg: color("#2ac3de") },
-  "variable.member": { fg: color("#c0caf5") },
-  "variable.parameter": { fg: color("#c0caf5") },
-  operator: { fg: color("#bb9af7") },
-  "operator.word": { fg: color("#bb9af7") },
-  punctuation: { fg: color("#a9b1d6") },
-  "punctuation.bracket": { fg: color("#a9b1d6") },
-  "punctuation.delimiter": { fg: color("#a9b1d6") },
-  tag: { fg: color("#7aa2f7") },
-  "tag.attribute": { fg: color("#e0af68") },
-  "tag.delimiter": { fg: color("#a9b1d6") },
-});
+function buildSyntaxStyle(palette: SyntaxPalette): SyntaxStyle {
+  return SyntaxStyle.fromStyles({
+    default: { fg: color(palette.default) },
+    keyword: { fg: color(palette.keyword), bold: true },
+    "keyword.function": { fg: color(palette.keyword), bold: true },
+    "keyword.operator": { fg: color(palette.keyword), bold: true },
+    string: { fg: color(palette.string) },
+    "string.escape": { fg: color(palette.stringEscape) },
+    "string.special": { fg: color(palette.string) },
+    number: { fg: color(palette.number) },
+    constant: { fg: color(palette.number) },
+    "constant.builtin": { fg: color(palette.number) },
+    comment: { fg: color(palette.comment), italic: true },
+    function: { fg: color(palette.function) },
+    "function.call": { fg: color(palette.function) },
+    "function.method": { fg: color(palette.function) },
+    "function.method.call": { fg: color(palette.function) },
+    "function.builtin": { fg: color(palette.function) },
+    type: { fg: color(palette.type) },
+    "type.builtin": { fg: color(palette.type) },
+    "type.definition": { fg: color(palette.type) },
+    property: { fg: color(palette.property) },
+    variable: { fg: color(palette.variable) },
+    "variable.builtin": { fg: color(palette.variableBuiltin) },
+    "variable.member": { fg: color(palette.variable) },
+    "variable.parameter": { fg: color(palette.variable) },
+    operator: { fg: color(palette.operator) },
+    "operator.word": { fg: color(palette.operator) },
+    punctuation: { fg: color(palette.punctuation) },
+    "punctuation.bracket": { fg: color(palette.punctuation) },
+    "punctuation.delimiter": { fg: color(palette.punctuation) },
+    tag: { fg: color(palette.tag) },
+    "tag.attribute": { fg: color(palette.tagAttribute) },
+    "tag.delimiter": { fg: color(palette.tagDelimiter) },
+  });
+}
+
+export function createSyntaxStyle(theme: InkTheme): SyntaxStyle {
+  return buildSyntaxStyle(theme.syntax);
+}
+
+export const syntaxStyle = createSyntaxStyle(defaultTheme);
 
 export function getHighlightingClient(): TreeSitterClient {
   const client = getTreeSitterClient();
@@ -148,14 +157,7 @@ export function getHighlightingClient(): TreeSitterClient {
 }
 
 function normalizeShellPlaceholder(token: string): string {
-  const value = token.slice(1, -1);
-
-  if (value.includes('"') && value.includes("'")) {
-    return token;
-  }
-
-  const quote = value.includes('"') ? "'" : '"';
-  return `${quote}${value}${quote}`;
+  return `"${"_".repeat(token.length - 2)}"`;
 }
 
 function normalizeSourceForHighlighting(content: string, filetype: string): string {
@@ -165,10 +167,14 @@ function normalizeSourceForHighlighting(content: string, filetype: string): stri
 
   // Markdown docs often use angle-bracket placeholders like <path-to-file.md>.
   // Bash parses those as redirects, which can swallow following commands.
-  return content.replace(/<[^\s<>]+>/g, normalizeShellPlaceholder);
+  return content.replace(/<[^<>\r\n]+>/g, normalizeShellPlaceholder);
 }
 
-export async function highlightCode(content: string, filetype: string): Promise<HighlightChunk[]> {
+export async function highlightCode(
+  content: string,
+  filetype: string,
+  style: SyntaxStyle = syntaxStyle,
+): Promise<HighlightChunk[]> {
   const client = getHighlightingClient();
   await client.initialize();
 
@@ -179,7 +185,7 @@ export async function highlightCode(content: string, filetype: string): Promise<
     return [{ text: content, attributes: 0 }];
   }
 
-  return treeSitterToTextChunks(content, result.highlights, syntaxStyle).map((chunk) => ({
+  return treeSitterToTextChunks(content, result.highlights, style).map((chunk) => ({
     text: chunk.text,
     fg: chunk.fg,
     attributes: chunk.attributes ?? 0,

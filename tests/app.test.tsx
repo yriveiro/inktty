@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test";
 import { App } from "../src/App";
+import { getEmbeddedThemes, type InkTheme } from "../src/lib/theme";
 import {
   destroyTestSetup,
   emitSelection,
@@ -18,12 +19,39 @@ import {
 } from "./test-utils";
 
 let testSetup: TestSetup | undefined;
+const defaultThemes = getEmbeddedThemes();
 
-async function renderApp(content: string, fileName = "test.md", width = 80, height = 24) {
-  testSetup = await testRender(<App fileName={fileName} content={content} />, {
-    width,
-    height,
+function createThemes(...themeNames: string[]): InkTheme[] {
+  return themeNames.map((themeName) => {
+    const theme = defaultThemes.find((candidate) => candidate.name === themeName);
+
+    if (!theme) {
+      throw new Error(`Missing test theme: ${themeName}`);
+    }
+
+    return theme;
   });
+}
+
+async function renderApp(
+  content: string,
+  fileName = "test.md",
+  width = 80,
+  height = 24,
+  options: { themes?: InkTheme[]; initialThemeName?: string } = {},
+) {
+  testSetup = await testRender(
+    <App
+      fileName={fileName}
+      content={content}
+      themes={options.themes ?? defaultThemes}
+      initialThemeName={options.initialThemeName}
+    />,
+    {
+      width,
+      height,
+    },
+  );
 
   return testSetup;
 }
@@ -40,28 +68,78 @@ afterEach(async () => {
 });
 
 describe("App", () => {
-  describe("header", () => {
+  describe("footer chrome", () => {
     test("displays the filename", async () => {
       const setup = await renderApp("# Hello", "README.md");
 
       expect(await renderFrame(setup)).toContain("README.md");
+      expect(await renderFrame(setup)).toContain("Inktty | README.md | tokyo-night");
     });
 
-    test("shows mode indicators", async () => {
+    test("shows the current mode in the footer", async () => {
       const setup = await renderApp("# Hello");
       const frame = await renderFrame(setup);
 
-      expect(frame).toContain("view");
-      expect(frame).toContain("code");
+      expect(frame).toContain("view y:1");
+      expect(frame).not.toContain("view code");
     });
 
-    test("shows tab toggle and quit hints", async () => {
+    test("keeps controls inside the help drawer", async () => {
       const setup = await renderApp("# Hello");
       const frame = await renderFrame(setup);
 
-      expect(frame).toContain("tab: toggle");
-      expect(frame).toContain("q: quit");
-      expect(frame).not.toContain("l: lines");
+      expect(frame).not.toContain("tab: mode");
+      expect(frame).not.toContain("j/k: scroll");
+      expect(frame).not.toContain("q: quit");
+      expect(frame).not.toContain("t/T: theme");
+      expect(frame).not.toContain("h/l: pan");
+      expect(frame).not.toContain("w: wrap");
+      expect(frame).not.toContain("n: lines");
+    });
+
+    test("shows status information in the bottom bar", async () => {
+      const setup = await renderApp("# Hello", "README.md");
+      const frame = await renderFrame(setup);
+
+      expect(frame).toContain("Inktty | README.md | tokyo-night | view y:1");
+      expect(frame).toContain("100% | ? Help");
+    });
+
+    test("hides theme cycling hint when only one theme is available", async () => {
+      const setup = await renderApp("# Hello", "README.md", 80, 24, {
+        themes: createThemes("tokyo-night"),
+      });
+
+      await renderFrame(setup);
+      await pressKey(setup, "/", "?");
+
+      const frame = await renderFrame(setup);
+
+      expect(frame).toContain("Inktty | README.md | tokyo-night");
+      expect(frame).not.toContain("t/T");
+    });
+
+    test("expands help when ? is pressed and closes it with escape", async () => {
+      const setup = await renderApp("# Hello", "README.md", 90, 16);
+
+      await renderFrame(setup);
+      await pressKey(setup, "/", "?");
+
+      let frame = await renderFrame(setup);
+      expect(frame).toContain("k/up");
+      expect(frame).toContain("up");
+      expect(frame).toContain("tab");
+      expect(frame).toContain("toggle view/code");
+      expect(frame).toContain("esc");
+      expect(frame).toContain("close help");
+      expect(frame).toContain("README.md");
+      expect(frame).toContain("tokyo-night");
+      expect(frame).toContain("view y:1");
+      expect(frame).toContain("? Help");
+
+      await pressKey(setup, "escape", "\u001B");
+      frame = await renderFrame(setup);
+      expect(frame).not.toContain("go to top");
     });
   });
 
@@ -91,8 +169,19 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
-      expect(rgb(findSpanOnLine(setup, /const x = 1/, "const"))).toEqual([122, 162, 247]);
-      expect(rgb(findSpanOnLine(setup, /const x = 1/, "1"))).toEqual([255, 158, 100]);
+      expect(rgb(findSpanContainingText(setup, "const"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanContainingText(setup, "1"))).toEqual([255, 158, 100]);
+    });
+
+    test("highlights tilde fenced code blocks in view mode", async () => {
+      const setup = await renderApp("~~~ts\nconst x = 1\n~~~");
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(rgb(findSpanContainingText(setup, "const"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanContainingText(setup, "1"))).toEqual([255, 158, 100]);
     });
 
     test("highlights bash fenced code blocks", async () => {
@@ -167,10 +256,69 @@ describe("App", () => {
       expect(rgb(bunSpans.at(-1))).toEqual([224, 175, 104]);
     });
 
+    test("renders custom heading, inline code, link, list, quote, callout, and table styling", async () => {
+      const setup = await renderApp(await fixture("rich-markdown.md"), "rich.md", 80, 28);
+      const frame = await renderFrame(setup);
+
+      expect(frame).toContain("# Release Notes");
+      expect(frame).toContain("inline code");
+      expect(frame).toContain("gh GitHub link");
+      expect(frame).toContain("[ ]");
+      expect(frame).toContain("[x]");
+      expect(frame).toContain("•");
+      expect(frame).toContain("> │ A plain quote lives here.");
+      expect(frame).toContain("[NOTE] Terminal rendering");
+      expect(frame).toContain("Callouts should stand out in the reader.");
+      expect(frame).toContain("Name < | Value >");
+      expect(frame).toContain("alpha  |       1");
+      expect(frame).toContain("beta   |      20");
+    });
+
+    test("applies the expected custom colors to headings, inline code, task states, and links", async () => {
+      const setup = await renderApp(await fixture("rich-markdown.md"), "rich.md");
+
+      await renderFrame(setup);
+
+      expect(rgb(findSpanContainingText(setup, "# Release Notes"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanByText(setup, "inline code"))).toEqual([224, 175, 104]);
+      expect(rgb(findSpanOnLine(setup, /ship heading chrome/, "[ ]"))).toEqual([224, 175, 104]);
+      expect(rgb(findSpanOnLine(setup, /support checkbox states/, "[x]"))).toEqual([158, 206, 106]);
+      expect(rgb(findSpanContainingText(setup, "gh GitHub link"))).toEqual([122, 162, 247]);
+    });
+
     test("matches snapshot", async () => {
       const setup = await renderApp(await fixture("basic.md"), "snap.md");
 
       expect(await renderFrame(setup)).toMatchSnapshot();
+    });
+
+    test("cycles to the next theme with t", async () => {
+      const setup = await renderApp("# Hello", "theme.md", 100, 12, {
+        themes: createThemes("nord", "solarized-dark", "tokyo-night"),
+        initialThemeName: "nord",
+      });
+
+      expect(await renderFrame(setup)).toContain("Inktty | theme.md | nord | view y:1");
+
+      await pressKey(setup, "t");
+
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("Inktty | theme.md | solarized-dark | view y:1");
+      expect(rgb(findSpanContainingText(setup, "# Hello"))).toEqual([38, 139, 210]);
+    });
+
+    test("cycles to the previous theme with T", async () => {
+      const setup = await renderApp("# Hello", "theme.md", 100, 12, {
+        themes: createThemes("nord", "solarized-dark", "tokyo-night"),
+        initialThemeName: "nord",
+      });
+
+      await renderFrame(setup);
+      await pressKey(setup, "t", "T");
+
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("Inktty | theme.md | tokyo-night | view y:1");
+      expect(rgb(findSpanContainingText(setup, "# Hello"))).toEqual([122, 162, 247]);
     });
   });
 
@@ -183,26 +331,101 @@ describe("App", () => {
 
       const frame = await renderFrame(setup);
       expect(frame).toContain("# Hello World");
-      expect(frame).not.toContain("1 |");
+      expect(frame).not.toContain("1 | # Hello World");
     });
 
-    test("shows line numbers toggle in header", async () => {
+    test("shows line number and wrap toggles in the help drawer", async () => {
       const setup = await renderApp("# Hello");
 
       await renderFrame(setup);
       await pressKey(setup, "tab", "\t");
+      await pressKey(setup, "/", "?");
 
-      expect(await renderFrame(setup)).toContain("l: lines off");
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("w");
+      expect(frame).toContain("toggle wrap");
+      expect(frame).toContain("n");
+      expect(frame).toContain("toggle line numbers");
     });
 
-    test("toggles line numbers on with l", async () => {
+    test("toggles line numbers on with n", async () => {
       const setup = await renderApp("# Hello World");
 
       await renderFrame(setup);
       await pressKey(setup, "tab", "\t");
-      await pressKey(setup, "l");
+      await pressKey(setup, "n");
 
       expect(await renderFrame(setup)).toContain("1 | # Hello World");
+    });
+
+    test("toggles soft wrap off with w and shows horizontal scroll controls in help", async () => {
+      const setup = await renderApp(
+        "averylonglinewithoutspaces-1234567890-abcdefghij",
+        "wrap.md",
+        90,
+        12,
+      );
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      await pressKey(setup, "w");
+      await pressKey(setup, "/", "?");
+
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("h/l");
+      expect(frame).toContain("horizontal scroll");
+    });
+
+    test("shows code mode status in the bottom bar", async () => {
+      const setup = await renderApp("# Hello World", "code.md", 80, 12);
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("Inktty | code.md | tokyo-night | code y:1 | w:on | n:off");
+    });
+
+    test("shows horizontal offset in the bottom bar when nowrap code mode is active", async () => {
+      const setup = await renderApp("a".repeat(100), "scroll-x.md", 80, 10);
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      await pressKey(setup, "w");
+      await pressKey(setup, "l");
+      await pressKey(setup, "l");
+
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("x:8");
+    });
+
+    test("h and l horizontally scroll when soft wrap is disabled", async () => {
+      const content = "averylonglinewithoutspaces-1234567890-abcdefghij";
+      const setup = await renderApp(content, "scroll-x.md", 30, 8);
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      await pressKey(setup, "w");
+
+      let frame = await renderFrame(setup);
+      expect(frame).toContain("averylonglinewithoutspaces");
+      expect(frame).not.toContain("abcdefghij");
+
+      await pressKey(setup, "l");
+      await pressKey(setup, "l");
+      await pressKey(setup, "l");
+      await pressKey(setup, "l");
+      await pressKey(setup, "l");
+      await pressKey(setup, "l");
+      frame = await renderFrame(setup);
+
+      expect(frame).toContain("1234567890");
+      expect(frame).not.toContain("averylonglinewithoutspaces");
+
+      await pressKey(setup, "h");
+      frame = await renderFrame(setup);
+      expect(frame).toContain("ithoutspaces");
+      expect(frame).not.toContain("averylonglinewithoutspaces");
     });
 
     test("only highlights code inside fenced blocks", async () => {
@@ -221,6 +444,31 @@ describe("App", () => {
       expect(rgb(findSpanByText(setup, "1"))).toEqual([255, 158, 100]);
     });
 
+    test("uses the active theme palette in code mode", async () => {
+      const setup = await renderApp("```ts\nconst x = 1\n```", "code-theme.md", 80, 12, {
+        themes: createThemes("nord", "solarized-dark"),
+        initialThemeName: "solarized-dark",
+      });
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      await renderFrame(setup);
+
+      expect(rgb(findSpanByText(setup, "const"))).toEqual([38, 139, 210]);
+      expect(rgb(findSpanByText(setup, "1"))).toEqual([203, 75, 22]);
+    });
+
+    test("highlights tilde fenced code blocks in code mode", async () => {
+      const setup = await renderApp("~~~ts\nconst x = 1\n~~~");
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      await renderFrame(setup);
+
+      expect(rgb(findSpanByText(setup, "const"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanByText(setup, "1"))).toEqual([255, 158, 100]);
+    });
+
     test("highlights bash only inside fenced blocks", async () => {
       const content = ["# Title", "", "```bash", "if true; then", 'echo "hi"', "fi", "```"].join(
         "\n",
@@ -231,17 +479,17 @@ describe("App", () => {
       await pressKey(setup, "tab", "\t");
       await renderFrame(setup);
 
-      expect(rgb(findSpanByText(setup, "if"))).toEqual([122, 162, 247]);
-      expect(rgb(findSpanByText(setup, '"hi"'))).toEqual([158, 206, 106]);
+      expect(rgb(findSpanContainingText(setup, "if"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanContainingText(setup, '"hi"'))).toEqual([158, 206, 106]);
       expect(findSpanContainingText(setup, "# Title")).toBeDefined();
       expect(rgb(findSpanContainingText(setup, "# Title"))).not.toEqual([122, 162, 247]);
     });
 
-    test("pressing l in view mode is ignored", async () => {
+    test("pressing n in view mode is ignored", async () => {
       const setup = await renderApp("# Hello World");
 
       await renderFrame(setup);
-      await pressKey(setup, "l");
+      await pressKey(setup, "n");
 
       const frame = await renderFrame(setup);
       expect(frame).toContain("Hello World");
@@ -263,8 +511,8 @@ describe("App", () => {
       const setup = await renderApp("# Hello");
       const frame = await renderFrame(setup);
 
-      expect(frame).toContain("view");
-      expect(frame).toContain("code");
+      expect(frame).toContain("view y:1");
+      expect(frame).not.toContain("code y:1");
     });
 
     test("tab switches to code mode", async () => {
@@ -275,7 +523,7 @@ describe("App", () => {
 
       const frame = await renderFrame(setup);
       expect(frame).toContain("# Hello");
-      expect(frame).toContain("l: lines");
+      expect(frame).toContain("code y:1 | w:on | n:off");
     });
 
     test("tab twice returns to view mode", async () => {
@@ -324,6 +572,7 @@ describe("App", () => {
 
       expect(copySpy).toHaveBeenCalledWith("Copy this text");
       expect(await renderFrame(setup)).toContain("copied!");
+      expect(await renderFrame(setup)).toContain("copied! |");
     });
 
     test("ignores empty selections", async () => {
@@ -341,7 +590,7 @@ describe("App", () => {
   describe("scrolling", () => {
     test("j and k scroll the viewport", async () => {
       const content = Array.from({ length: 12 }, (_, i) => `Line ${i + 1}`).join("\n\n");
-      const setup = await renderApp(content, "scroll.md", 40, 6);
+      const setup = await renderApp(content, "scroll.md", 80, 6);
 
       let frame = await renderFrame(setup);
       expect(frame).toContain("Line 1");
@@ -351,8 +600,9 @@ describe("App", () => {
       await pressKey(setup, "j");
       frame = await renderFrame(setup);
       expect(frame).toContain("Line 2");
-      expect(frame).toContain("Line 6");
+      expect(frame).toContain("Line 3");
       expect(frame).not.toContain("Line 1\n");
+      expect(frame).toContain("Inktty | scroll.md | tokyo-night | view y:3");
 
       await pressKey(setup, "k");
       expect(await renderFrame(setup)).toContain("Line 1");

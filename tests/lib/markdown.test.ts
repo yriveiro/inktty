@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { stripMarkdown, withLineNumbers } from "../../src/lib/markdown";
+import { extractFencedCodeBlocks, stripMarkdown, withLineNumbers } from "../../src/lib/markdown";
 
 describe("markdown utilities", () => {
   test("strips common markdown syntax for parsed view text", () => {
@@ -19,5 +19,34 @@ describe("markdown utilities", () => {
     expect(
       withLineNumbers(Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join("\n")),
     ).toContain("12 | line 12");
+  });
+
+  test("extracts fenced code blocks using the shared markdown lexer", () => {
+    const source = [
+      "Intro",
+      "",
+      "~~~ts",
+      "const x = 1",
+      "~~~",
+      "",
+      "```bash",
+      "echo hi",
+      "```",
+    ].join("\n");
+
+    expect(extractFencedCodeBlocks(source)).toEqual([
+      {
+        code: "const x = 1",
+        codeLines: ["const x = 1"],
+        infoString: "ts",
+        startLine: 2,
+      },
+      {
+        code: "echo hi",
+        codeLines: ["echo hi"],
+        infoString: "bash",
+        startLine: 6,
+      },
+    ]);
   });
 });

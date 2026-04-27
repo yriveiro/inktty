@@ -1,5 +1,6 @@
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { type RefObject, useLayoutEffect } from "react";
+import type { InkTheme } from "../lib/theme";
 import { CodeModeView } from "./CodeModeView";
 import { CustomMarkdown } from "./CustomMarkdown";
 
@@ -11,6 +12,9 @@ interface MarkdownReaderProps {
   content: string;
   mode: "view" | "code";
   showLineNumbers: boolean;
+  softWrap: boolean;
+  horizontalOffset: number;
+  theme: InkTheme;
   scrollboxRef: RefObject<ScrollBoxRenderable | null>;
   scrollRestoreRequest: ScrollRestoreRequest | null;
 }
@@ -19,6 +23,9 @@ export function MarkdownReader({
   content,
   mode,
   showLineNumbers,
+  softWrap,
+  horizontalOffset,
+  theme,
   scrollboxRef,
   scrollRestoreRequest,
 }: MarkdownReaderProps) {
@@ -40,15 +47,23 @@ export function MarkdownReader({
       id="markdown-reader-scrollbox"
       ref={scrollboxRef}
       flexGrow={1}
+      flexShrink={1}
       focused
+      scrollY
       style={{
         viewportOptions: { padding: 1 },
       }}
     >
       {mode === "view" ? (
-        <CustomMarkdown content={content} />
+        <CustomMarkdown content={content} theme={theme} />
       ) : (
-        <CodeModeView content={content} showLineNumbers={showLineNumbers} />
+        <CodeModeView
+          content={content}
+          showLineNumbers={showLineNumbers}
+          softWrap={softWrap}
+          horizontalOffset={horizontalOffset}
+          theme={theme}
+        />
       )}
     </scrollbox>
   );

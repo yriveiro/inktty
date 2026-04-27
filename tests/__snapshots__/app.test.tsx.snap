@@ -1,9 +1,9 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
 exports[`App view mode matches snapshot 1`] = `
-" inktty | snap.md                           view  code  | tab: toggle | q: quit 
-                                                                                
- Hello                                                                          
+"                                                                                
+  # Hello                                                                       
+ ────────────────────────────────────────────────────────────────────────────── 
                                                                                 
  This is bold text.                                                             
                                                                                 
@@ -24,13 +24,12 @@ exports[`App view mode matches snapshot 1`] = `
                                                                                 
                                                                                 
                                                                                 
-                                                                                
+ Inktty | snap.md | tokyo-night | view y:1                        100% | ? Help 
 "
 `;
 
 exports[`App code mode matches snapshot 1`] = `
-" inktty | snap.md            view  code  | tab: toggle | l: lines off | q: quit 
-                                                                                
+"                                                                                
  # Hello                                                                        
                                                                                 
  This is **bold** text.                                                         
@@ -53,5 +52,6 @@ exports[`App code mode matches snapshot 1`] = `
                                                                                 
                                                                                 
                                                                                 
+ Inktty | snap.md | tokyo-night | code y:1 | w:on | n:off         100% | ? Help 
 "
 `;

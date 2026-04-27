@@ -119,7 +119,8 @@ describe("Package behavior", () => {
       expect(frame).toContain("[ ]");
       expect(frame).toContain("[x]");
       expect(frame).toContain("[NOTE] Terminal rendering");
-      expect(frame).toContain("Name < | Value >");
+      expect(frame).toContain("┌───────────┐");
+      expect(frame).toContain("│Name │Value│");
     });
   });
 });

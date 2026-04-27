@@ -191,6 +191,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
+      expect(await renderFrame(setup)).toContain("");
       expect(rgb(findSpanOnLine(setup, /if true; then/, "if"))).toEqual([122, 162, 247]);
       expect(rgb(findSpanOnLine(setup, /echo "hi"/, '"hi"'))).toEqual([158, 206, 106]);
     });
@@ -202,6 +203,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
+      expect(await renderFrame(setup)).toContain("");
       expect(rgb(findSpanOnLine(setup, /name: sample-app/, ":"))).toEqual([169, 177, 214]);
       expect(rgb(findSpanOnLine(setup, /name: sample-app/, "sample-app"))).toEqual([158, 206, 106]);
     });
@@ -213,6 +215,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
+      expect(await renderFrame(setup)).toContain("");
       expect(rgb(findSpanOnLine(setup, /inktty/, '"inktty"'))).toEqual([158, 206, 106]);
     });
 
@@ -224,6 +227,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
+      expect(await renderFrame(setup)).toContain("");
       expect(rgb(findSpanOnLine(setup, /class Hello/, "class"))).toEqual([122, 162, 247]);
       expect(rgb(findSpanOnLine(setup, /return "hi";/, '"hi"'))).toEqual([158, 206, 106]);
     });
@@ -235,12 +239,52 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
+      expect(await renderFrame(setup)).toContain("󱁢");
       expect(rgb(findSpanOnLine(setup, /default allow := false/, "default"))).toEqual([
         122, 162, 247,
       ]);
       expect(rgb(findSpanOnLine(setup, /allow if input.user == "alice"/, '"alice"'))).toEqual([
         158, 206, 106,
       ]);
+    });
+
+    test("renders nerd font icons for python fenced code blocks", async () => {
+      const setup = await renderApp('```python\nprint("hi")\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain("");
+    });
+
+    test("honors code block theme overrides for border, separator, and icon spacing", async () => {
+      const customTheme = structuredClone(createThemes("tokyo-night")[0]);
+
+      if (!customTheme) {
+        throw new Error("Missing custom test theme");
+      }
+
+      customTheme.name = "custom-code-block-theme";
+      customTheme.markdown.codeBlock.borderVisible = false;
+      customTheme.markdown.codeBlock.separator = false;
+      customTheme.markdown.codeBlock.topSpacing = 1;
+      customTheme.markdown.codeBlock.bottomSpacing = 1;
+
+      const setup = await renderApp('```bash\necho "hi"\n```', "code-block-theme.md", 80, 14, {
+        themes: [customTheme],
+        initialThemeName: customTheme.name,
+      });
+
+      const frame = await renderFrame(setup);
+      const lines = frame.split("\n");
+      const iconLineIndex = lines.findIndex((line) => line.includes(""));
+
+      expect(frame).toContain("");
+      expect(frame).not.toMatch(/[─│┌┐└┘]/);
+      expect(iconLineIndex).toBeGreaterThan(0);
+      expect(lines[iconLineIndex - 1]?.trim()).toBe("");
+      expect(lines[iconLineIndex + 1]?.trim()).toBe("");
     });
 
     test("keeps later bun commands highlighted after markdown placeholders", async () => {
@@ -269,9 +313,10 @@ describe("App", () => {
       expect(frame).toContain("> │ A plain quote lives here.");
       expect(frame).toContain("[NOTE] Terminal rendering");
       expect(frame).toContain("Callouts should stand out in the reader.");
-      expect(frame).toContain("Name < | Value >");
-      expect(frame).toContain("alpha  |       1");
-      expect(frame).toContain("beta   |      20");
+      expect(frame).toContain("┌───────────┐");
+      expect(frame).toContain("│Name │Value│");
+      expect(frame).toContain("│alpha│    1│");
+      expect(frame).toContain("│beta │   20│");
     });
 
     test("applies the expected custom colors to headings, inline code, task states, and links", async () => {
@@ -284,6 +329,38 @@ describe("App", () => {
       expect(rgb(findSpanOnLine(setup, /ship heading chrome/, "[ ]"))).toEqual([224, 175, 104]);
       expect(rgb(findSpanOnLine(setup, /support checkbox states/, "[x]"))).toEqual([158, 206, 106]);
       expect(rgb(findSpanContainingText(setup, "gh GitHub link"))).toEqual([122, 162, 247]);
+    });
+
+    test("honors heading theme overrides for foreground, icon, and separator", async () => {
+      const customTheme = structuredClone(createThemes("tokyo-night")[0]);
+
+      if (!customTheme) {
+        throw new Error("Missing custom test theme");
+      }
+
+      customTheme.name = "custom-heading-theme";
+      customTheme.markdown.heading.h1.foreground = "#ff00ff";
+      customTheme.markdown.heading.h1.background = "#101820";
+      customTheme.markdown.heading.h1.icon = "!";
+      customTheme.markdown.heading.h1.separator = false;
+      customTheme.markdown.heading.h1.topSpacing = 1;
+      customTheme.markdown.heading.h1.bottomSpacing = 1;
+
+      const setup = await renderApp("# Hello", "custom-theme.md", 80, 12, {
+        themes: [customTheme],
+        initialThemeName: customTheme.name,
+      });
+
+      const frame = await renderFrame(setup);
+      const lines = frame.split("\n");
+      const headingLineIndex = lines.findIndex((line) => line.includes("! Hello"));
+
+      expect(frame).toContain("! Hello");
+      expect(frame).not.toMatch(/─{3,}/);
+      expect(headingLineIndex).toBeGreaterThan(0);
+      expect(lines[headingLineIndex - 1]?.trim()).toBe("");
+      expect(lines[headingLineIndex + 1]?.trim()).toBe("");
+      expect(rgb(findSpanContainingText(setup, "! Hello"))).toEqual([255, 0, 255]);
     });
 
     test("matches snapshot", async () => {
@@ -376,6 +453,30 @@ describe("App", () => {
       expect(frame).toContain("horizontal scroll");
     });
 
+    test("keeps code mode help entries visible on narrow terminals", async () => {
+      const setup = await renderApp(
+        "averylonglinewithoutspaces-1234567890-abcdefghij",
+        "wrap.md",
+        50,
+        16,
+      );
+
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      await pressKey(setup, "w");
+      await pressKey(setup, "/", "?");
+
+      const frame = await renderFrame(setup);
+      expect(frame).toContain("w");
+      expect(frame).toContain("toggle wrap");
+      expect(frame).toContain("n");
+      expect(frame).toContain("toggle line");
+      expect(frame).toContain("numbers");
+      expect(frame).toContain("h/l");
+      expect(frame).toContain("horizontal");
+      expect(frame).toContain("scroll");
+    });
+
     test("shows code mode status in the bottom bar", async () => {
       const setup = await renderApp("# Hello World", "code.md", 80, 12);
 
@@ -396,6 +497,7 @@ describe("App", () => {
       await pressKey(setup, "l");
 
       const frame = await renderFrame(setup);
+      expect(frame).toContain("n:off");
       expect(frame).toContain("x:8");
     });
 

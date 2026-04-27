@@ -27,15 +27,52 @@ describe("theme helpers", () => {
       chrome: { brand: "#ffffff" },
       markdown: {
         heading: {
-          h1: { foreground: "#ff0000" },
+          h1: {
+            foreground: "#ff0000",
+            separator: false,
+            icon: "!",
+            topSpacing: 1,
+            bottomSpacing: 2,
+          },
         },
       },
     });
 
     expect(mergedTheme.chrome.brand).toBe("#ffffff");
     expect(mergedTheme.markdown.heading.h1.foreground).toBe("#ff0000");
+    expect(mergedTheme.markdown.heading.h1.separator).toBe(false);
+    expect(mergedTheme.markdown.heading.h1.icon).toBe("!");
+    expect(mergedTheme.markdown.heading.h1.topSpacing).toBe(1);
+    expect(mergedTheme.markdown.heading.h1.bottomSpacing).toBe(2);
     expect(baseTheme.chrome.brand).toBe("#7aa2f7");
     expect(baseTheme.markdown.heading.h1.foreground).toBe("#7aa2f7");
+    expect(baseTheme.markdown.heading.h1.separator).toBe(true);
+    expect(baseTheme.markdown.heading.h1.topSpacing).toBe(0);
+    expect(baseTheme.markdown.heading.h1.bottomSpacing).toBe(0);
+  });
+
+  test("applies code block behavior overrides without mutating the base theme", () => {
+    const baseTheme = requireTheme("tokyo-night");
+
+    const mergedTheme = applyThemeOverride(baseTheme, {
+      markdown: {
+        codeBlock: {
+          borderVisible: false,
+          separator: false,
+          topSpacing: 1,
+          bottomSpacing: 2,
+        },
+      },
+    });
+
+    expect(mergedTheme.markdown.codeBlock.borderVisible).toBe(false);
+    expect(mergedTheme.markdown.codeBlock.separator).toBe(false);
+    expect(mergedTheme.markdown.codeBlock.topSpacing).toBe(1);
+    expect(mergedTheme.markdown.codeBlock.bottomSpacing).toBe(2);
+    expect(baseTheme.markdown.codeBlock.borderVisible).toBe(true);
+    expect(baseTheme.markdown.codeBlock.separator).toBe(true);
+    expect(baseTheme.markdown.codeBlock.topSpacing).toBe(0);
+    expect(baseTheme.markdown.codeBlock.bottomSpacing).toBe(0);
   });
 
   test("resolves the requested theme and falls back to the default theme", () => {
@@ -85,6 +122,17 @@ describe("theme loading", () => {
             'brand = "#ffffff"',
             "[markdown.heading.h1]",
             'foreground = "#ff00ff"',
+            'background = "#101820"',
+            'icon = "!"',
+            "separator = false",
+            "topSpacing = 1",
+            "bottomSpacing = 2",
+            "",
+            "[markdown.codeBlock]",
+            "borderVisible = false",
+            "separator = false",
+            "topSpacing = 1",
+            "bottomSpacing = 1",
           ].join("\n");
         }
 
@@ -105,6 +153,15 @@ describe("theme loading", () => {
     expect(midnight.chrome.brand).toBe("#ffffff");
     expect(midnight.chrome.controls).toBe("#123456");
     expect(midnight.markdown.heading.h1.foreground).toBe("#ff00ff");
+    expect(midnight.markdown.heading.h1.background).toBe("#101820");
+    expect(midnight.markdown.heading.h1.icon).toBe("!");
+    expect(midnight.markdown.heading.h1.separator).toBe(false);
+    expect(midnight.markdown.heading.h1.topSpacing).toBe(1);
+    expect(midnight.markdown.heading.h1.bottomSpacing).toBe(2);
+    expect(midnight.markdown.codeBlock.borderVisible).toBe(false);
+    expect(midnight.markdown.codeBlock.separator).toBe(false);
+    expect(midnight.markdown.codeBlock.topSpacing).toBe(1);
+    expect(midnight.markdown.codeBlock.bottomSpacing).toBe(1);
     expect(tokyoNight.name).toBe("tokyo-night");
   });
 
@@ -126,5 +183,22 @@ describe("theme loading", () => {
         },
       }),
     ).rejects.toThrow("Theme inheritance cycle detected for 'alpha'");
+  });
+
+  test("rejects invalid user theme overrides with a helpful validation error", async () => {
+    await expect(
+      loadAvailableThemes({
+        themesDir: "/virtual/themes",
+        readDir: async () => ["broken.toml"],
+        readTextFile: async () => {
+          return [
+            "[markdown.heading.h1]",
+            'foreground = "magenta"',
+            "topSpacing = -1",
+            'separator = "no"',
+          ].join("\n");
+        },
+      }),
+    ).rejects.toThrow(/Invalid theme config in .*broken\.toml/);
   });
 });

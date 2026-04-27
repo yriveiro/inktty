@@ -1,6 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
+import * as z from "zod";
 
 export interface SyntaxPalette {
   default: string;
@@ -23,9 +24,12 @@ export interface SyntaxPalette {
 
 export interface HeadingTheme {
   background: string;
+  bottomSpacing: number;
   border: string;
   foreground: string;
   icon: string;
+  separator: boolean;
+  topSpacing: number;
 }
 
 export interface LinkTheme {
@@ -38,6 +42,18 @@ export interface CalloutTheme {
   badge: string;
   border: string;
   foreground: string;
+}
+
+export interface CodeBlockTheme {
+  background: string;
+  border: string;
+  borderVisible: boolean;
+  bottomSpacing: number;
+  headerBackground: string;
+  label: string;
+  language: string;
+  separator: boolean;
+  topSpacing: number;
 }
 
 export interface InkTheme {
@@ -75,9 +91,13 @@ export interface InkTheme {
     codeBlock: {
       background: string;
       border: string;
+      borderVisible: boolean;
+      bottomSpacing: number;
       headerBackground: string;
       label: string;
       language: string;
+      separator: boolean;
+      topSpacing: number;
     };
     heading: {
       h1: HeadingTheme;
@@ -89,7 +109,6 @@ export interface InkTheme {
     };
     horizontalRule: {
       foreground: string;
-      icon: string;
     };
     inlineCode: {
       background: string;
@@ -143,6 +162,164 @@ export interface ThemeLoadOptions {
   themesDir?: string;
 }
 
+const hexColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+const nonNegativeIntegerSchema = z.int().nonnegative();
+
+const headingThemeOverrideSchema = z.strictObject({
+  background: hexColorSchema.optional(),
+  bottomSpacing: nonNegativeIntegerSchema.optional(),
+  border: hexColorSchema.optional(),
+  foreground: hexColorSchema.optional(),
+  icon: z.string().optional(),
+  separator: z.boolean().optional(),
+  topSpacing: nonNegativeIntegerSchema.optional(),
+});
+
+const codeBlockThemeOverrideSchema = z.strictObject({
+  background: hexColorSchema.optional(),
+  border: hexColorSchema.optional(),
+  borderVisible: z.boolean().optional(),
+  bottomSpacing: nonNegativeIntegerSchema.optional(),
+  headerBackground: hexColorSchema.optional(),
+  label: hexColorSchema.optional(),
+  language: hexColorSchema.optional(),
+  separator: z.boolean().optional(),
+  topSpacing: nonNegativeIntegerSchema.optional(),
+});
+
+const linkThemeOverrideSchema = z.strictObject({
+  foreground: hexColorSchema.optional(),
+  icon: z.string().optional(),
+});
+
+const calloutThemeOverrideSchema = z.strictObject({
+  background: hexColorSchema.optional(),
+  badge: z.string().optional(),
+  border: hexColorSchema.optional(),
+  foreground: hexColorSchema.optional(),
+});
+
+const themeOverrideSchema = z.strictObject({
+  chrome: z
+    .strictObject({
+      activeMode: hexColorSchema.optional(),
+      brand: hexColorSchema.optional(),
+      controls: hexColorSchema.optional(),
+      copied: hexColorSchema.optional(),
+      fileName: hexColorSchema.optional(),
+      headerBackground: hexColorSchema.optional(),
+      helpBackground: hexColorSchema.optional(),
+      inactiveMode: hexColorSchema.optional(),
+      lineNumber: hexColorSchema.optional(),
+    })
+    .optional(),
+  extends: z.string().optional(),
+  markdown: z
+    .strictObject({
+      blockquote: z
+        .strictObject({
+          border: hexColorSchema.optional(),
+          foreground: hexColorSchema.optional(),
+          marker: z.string().optional(),
+        })
+        .optional(),
+      callout: z
+        .strictObject({
+          caution: calloutThemeOverrideSchema.optional(),
+          danger: calloutThemeOverrideSchema.optional(),
+          example: calloutThemeOverrideSchema.optional(),
+          important: calloutThemeOverrideSchema.optional(),
+          info: calloutThemeOverrideSchema.optional(),
+          note: calloutThemeOverrideSchema.optional(),
+          question: calloutThemeOverrideSchema.optional(),
+          quote: calloutThemeOverrideSchema.optional(),
+          success: calloutThemeOverrideSchema.optional(),
+          tip: calloutThemeOverrideSchema.optional(),
+          warning: calloutThemeOverrideSchema.optional(),
+        })
+        .optional(),
+      codeBlock: z.strictObject(codeBlockThemeOverrideSchema.shape).optional(),
+      heading: z
+        .strictObject({
+          h1: headingThemeOverrideSchema.optional(),
+          h2: headingThemeOverrideSchema.optional(),
+          h3: headingThemeOverrideSchema.optional(),
+          h4: headingThemeOverrideSchema.optional(),
+          h5: headingThemeOverrideSchema.optional(),
+          h6: headingThemeOverrideSchema.optional(),
+        })
+        .optional(),
+      horizontalRule: z
+        .strictObject({
+          foreground: hexColorSchema.optional(),
+        })
+        .optional(),
+      inlineCode: z
+        .strictObject({
+          background: hexColorSchema.optional(),
+          foreground: hexColorSchema.optional(),
+        })
+        .optional(),
+      links: z
+        .strictObject({
+          anchor: linkThemeOverrideSchema.optional(),
+          default: linkThemeOverrideSchema.optional(),
+          github: linkThemeOverrideSchema.optional(),
+          mail: linkThemeOverrideSchema.optional(),
+          path: linkThemeOverrideSchema.optional(),
+          web: linkThemeOverrideSchema.optional(),
+        })
+        .optional(),
+      list: z
+        .strictObject({
+          bullet: z.string().optional(),
+          bulletForeground: hexColorSchema.optional(),
+          taskChecked: hexColorSchema.optional(),
+          taskUnchecked: hexColorSchema.optional(),
+        })
+        .optional(),
+      table: z
+        .strictObject({
+          background: hexColorSchema.optional(),
+          border: hexColorSchema.optional(),
+          centerAlignIndicator: z.string().optional(),
+          headerForeground: hexColorSchema.optional(),
+          leftAlignIndicator: z.string().optional(),
+          rightAlignIndicator: z.string().optional(),
+          rowForeground: hexColorSchema.optional(),
+          separatorForeground: hexColorSchema.optional(),
+        })
+        .optional(),
+    })
+    .optional(),
+  name: z.string().optional(),
+  syntax: z
+    .strictObject({
+      comment: hexColorSchema.optional(),
+      default: hexColorSchema.optional(),
+      function: hexColorSchema.optional(),
+      keyword: hexColorSchema.optional(),
+      number: hexColorSchema.optional(),
+      operator: hexColorSchema.optional(),
+      property: hexColorSchema.optional(),
+      punctuation: hexColorSchema.optional(),
+      string: hexColorSchema.optional(),
+      stringEscape: hexColorSchema.optional(),
+      tag: hexColorSchema.optional(),
+      tagAttribute: hexColorSchema.optional(),
+      tagDelimiter: hexColorSchema.optional(),
+      type: hexColorSchema.optional(),
+      variable: hexColorSchema.optional(),
+      variableBuiltin: hexColorSchema.optional(),
+    })
+    .optional(),
+});
+
+function formatThemeValidationError(filePath: string, error: z.ZodError): string {
+  const pretty = z.prettifyError(error).trim();
+  return `Invalid theme config in ${filePath}\n${pretty}`;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -174,13 +351,41 @@ function calloutTheme(
   return { badge, foreground, border, background };
 }
 
+function codeBlockTheme(
+  background: string,
+  border: string,
+  headerBackground: string,
+  label: string,
+  language: string,
+): CodeBlockTheme {
+  return {
+    background,
+    border,
+    borderVisible: true,
+    bottomSpacing: 0,
+    headerBackground,
+    label,
+    language,
+    separator: true,
+    topSpacing: 0,
+  };
+}
+
 function headingTheme(
   icon: string,
   foreground: string,
   border: string,
   background: string,
 ): HeadingTheme {
-  return { icon, foreground, border, background };
+  return {
+    background,
+    bottomSpacing: 0,
+    border,
+    foreground,
+    icon,
+    separator: true,
+    topSpacing: 0,
+  };
 }
 
 function linkTheme(icon: string, foreground: string): LinkTheme {
@@ -219,13 +424,7 @@ const tokyoNight: InkTheme = {
       tip: calloutTheme("[TIP]", "#9ece6a", "#9ece6a", "#18251c"),
       warning: calloutTheme("[WARNING]", "#e0af68", "#e0af68", "#2a2414"),
     },
-    codeBlock: {
-      background: "#1f2335",
-      border: "#414868",
-      headerBackground: "#16161e",
-      label: "#7aa2f7",
-      language: "#565f89",
-    },
+    codeBlock: codeBlockTheme("#1f2335", "#414868", "#16161e", "#7aa2f7", "#565f89"),
     heading: {
       h1: headingTheme("#", "#7aa2f7", "#7aa2f7", "#1f2335"),
       h2: headingTheme("##", "#2ac3de", "#2ac3de", "#1a1b26"),
@@ -236,7 +435,6 @@ const tokyoNight: InkTheme = {
     },
     horizontalRule: {
       foreground: "#565f89",
-      icon: "~",
     },
     inlineCode: {
       background: "#1f2335",
@@ -319,13 +517,7 @@ const nord: InkTheme = {
       tip: calloutTheme("[TIP]", "#a3be8c", "#a3be8c", "#2f3a30"),
       warning: calloutTheme("[WARNING]", "#d08770", "#d08770", "#3c312c"),
     },
-    codeBlock: {
-      background: "#3b4252",
-      border: "#4c566a",
-      headerBackground: "#2e3440",
-      label: "#88c0d0",
-      language: "#81a1c1",
-    },
+    codeBlock: codeBlockTheme("#3b4252", "#4c566a", "#2e3440", "#88c0d0", "#81a1c1"),
     heading: {
       h1: headingTheme("#", "#88c0d0", "#88c0d0", "#3b4252"),
       h2: headingTheme("##", "#8fbcbb", "#8fbcbb", "#2e3440"),
@@ -336,7 +528,6 @@ const nord: InkTheme = {
     },
     horizontalRule: {
       foreground: "#4c566a",
-      icon: "~",
     },
     inlineCode: {
       background: "#3b4252",
@@ -419,13 +610,7 @@ const solarizedDark: InkTheme = {
       tip: calloutTheme("[TIP]", "#859900", "#859900", "#24340d"),
       warning: calloutTheme("[WARNING]", "#b58900", "#b58900", "#3c3300"),
     },
-    codeBlock: {
-      background: "#002b36",
-      border: "#586e75",
-      headerBackground: "#073642",
-      label: "#268bd2",
-      language: "#586e75",
-    },
+    codeBlock: codeBlockTheme("#002b36", "#586e75", "#073642", "#268bd2", "#586e75"),
     heading: {
       h1: headingTheme("#", "#268bd2", "#268bd2", "#002b36"),
       h2: headingTheme("##", "#2aa198", "#2aa198", "#073642"),
@@ -436,7 +621,6 @@ const solarizedDark: InkTheme = {
     },
     horizontalRule: {
       foreground: "#586e75",
-      icon: "~",
     },
     inlineCode: {
       background: "#073642",
@@ -556,7 +740,14 @@ async function loadThemeSources({
     }
 
     const filePath = join(themesDir, entry);
-    const parsed = Bun.TOML.parse(await readTextFile(filePath)) as ThemeOverride;
+    const rawTheme = Bun.TOML.parse(await readTextFile(filePath));
+    const validated = themeOverrideSchema.safeParse(rawTheme);
+
+    if (!validated.success) {
+      throw new Error(formatThemeValidationError(filePath, validated.error));
+    }
+
+    const parsed = validated.data as ThemeOverride;
     const name = parsed.name ?? basename(entry, ".toml");
 
     sources.set(name, {

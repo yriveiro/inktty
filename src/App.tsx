@@ -33,6 +33,10 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
     mode === "code"
       ? `Inktty | ${fileName} | ${theme.name} | code y:${topLine} | w:${softWrap ? "on" : "off"} | n:${showLineNumbers ? "on" : "off"}${softWrap ? "" : ` | x:${horizontalOffset}`}`
       : `Inktty | ${fileName} | ${theme.name} | view y:${topLine}`;
+  const compactCodeFooterLeft =
+    mode === "code"
+      ? `Inktty | ${fileName} | ${theme.name} | code y:${topLine} | n:${showLineNumbers ? "on" : "off"}${softWrap ? "" : ` | x:${horizontalOffset}`}`
+      : `Inktty | ${fileName} | ${theme.name} | ${mode} y:${topLine}`;
   const compactFooterLeft =
     mode === "code" && !softWrap
       ? `Inktty | ${fileName} | ${theme.name} | code y:${topLine} | x:${horizontalOffset}`
@@ -41,6 +45,7 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
   const tinyFooterLeft = `Inktty | ${fileName}`;
   const footerLeftOptions = [
     fullFooterLeft,
+    compactCodeFooterLeft,
     compactFooterLeft,
     minimalFooterLeft,
     tinyFooterLeft,
@@ -75,6 +80,23 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
     }
   }
 
+  const helpEntries = helpRows.flatMap(([leftKey, leftDescription, rightKey, rightDescription]) => {
+    const entries: Array<readonly [string, string]> = [[leftKey, leftDescription]];
+
+    if (rightKey || rightDescription) {
+      entries.push([rightKey, rightDescription]);
+    }
+
+    return entries;
+  });
+  const helpColumnWidth = Math.max(
+    0,
+    ...helpEntries.map(
+      ([keyLabel, description]) => stringWidth(keyLabel) + 2 + stringWidth(description),
+    ),
+  );
+  const useSingleColumnHelp = width < helpColumnWidth * 2 + 6;
+
   const footerBar = (
     <box
       height={1}
@@ -98,22 +120,31 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
       paddingBottom={1}
       flexShrink={0}
     >
-      {helpRows.map(([leftKey, leftDescription, rightKey, rightDescription]) => (
-        <box key={`${leftKey}-${rightKey}`} width="100%" flexDirection="row">
-          <box width="50%" flexDirection="row">
-            <box width={10} shouldFill={false}>
-              <text fg={theme.chrome.controls}>{leftKey}</text>
+      {useSingleColumnHelp
+        ? helpEntries.map(([keyLabel, description]) => (
+            <box key={`${keyLabel}-${description}`} width="100%" flexDirection="row">
+              <box width={10} shouldFill={false}>
+                <text fg={theme.chrome.controls}>{keyLabel}</text>
+              </box>
+              <text fg={theme.chrome.fileName}>{description}</text>
             </box>
-            <text fg={theme.chrome.fileName}>{leftDescription}</text>
-          </box>
-          <box width="50%" flexDirection="row">
-            <box width={10} shouldFill={false}>
-              <text fg={theme.chrome.controls}>{rightKey}</text>
+          ))
+        : helpRows.map(([leftKey, leftDescription, rightKey, rightDescription]) => (
+            <box key={`${leftKey}-${rightKey}`} width="100%" flexDirection="row">
+              <box width="50%" flexDirection="row">
+                <box width={10} shouldFill={false}>
+                  <text fg={theme.chrome.controls}>{leftKey}</text>
+                </box>
+                <text fg={theme.chrome.fileName}>{leftDescription}</text>
+              </box>
+              <box width="50%" flexDirection="row">
+                <box width={10} shouldFill={false}>
+                  <text fg={theme.chrome.controls}>{rightKey}</text>
+                </box>
+                <text fg={theme.chrome.fileName}>{rightDescription}</text>
+              </box>
             </box>
-            <text fg={theme.chrome.fileName}>{rightDescription}</text>
-          </box>
-        </box>
-      ))}
+          ))}
     </box>
   ) : null;
 

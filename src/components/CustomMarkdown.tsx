@@ -1,5 +1,8 @@
+import { RGBA, type TextChunk, TextTableRenderable } from "@opentui/core";
+import { extend } from "@opentui/react";
 import type { Token, Tokens } from "marked";
-import { Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
+import { createElement, Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
+import { getCodeBlockMeta } from "../lib/code-block-meta";
 import { centerText, padTextEnd, padTextStart, stringWidth } from "../lib/display";
 import {
   createSyntaxStyle,
@@ -15,23 +18,12 @@ interface CustomMarkdownProps {
   theme: InkTheme;
 }
 
-const codeBlockLabels: Record<string, string> = {
-  bash: "sh",
-  fish: "sh",
-  javascript: "js",
-  javascriptreact: "jsx",
-  json: "json",
-  java: "java",
-  rego: "rego",
-  shell: "sh",
-  sh: "sh",
-  text: "txt",
-  typescript: "ts",
-  typescriptreact: "tsx",
-  yaml: "yaml",
-  yml: "yaml",
-  zsh: "sh",
-};
+let textTableRegistered = false;
+
+if (!textTableRegistered) {
+  extend({ "text-table": TextTableRenderable });
+  textTableRegistered = true;
+}
 
 const calloutAliases: Record<string, keyof InkTheme["markdown"]["callout"]> = {
   abstract: "info",
@@ -54,10 +46,6 @@ const calloutAliases: Record<string, keyof InkTheme["markdown"]["callout"]> = {
 function getHeadingStyle(theme: InkTheme, depth: number) {
   const normalizedDepth = Math.min(Math.max(depth, 1), 6) as 1 | 2 | 3 | 4 | 5 | 6;
   return theme.markdown.heading[`h${normalizedDepth}`];
-}
-
-function getCodeBlockLabel(filetype: string): string {
-  return codeBlockLabels[filetype] ?? filetype.slice(0, 6) ?? "txt";
 }
 
 function getLinkStyle(theme: InkTheme, href: string): LinkTheme {
@@ -134,6 +122,10 @@ function alignCell(text: string, width: number, align: Tokens.TableCell["align"]
     default:
       return padTextEnd(text, width);
   }
+}
+
+function createTableCell(text: string, foreground: string): TextChunk[] {
+  return [{ __isChunk: true, text, fg: RGBA.fromHex(foreground) }];
 }
 
 function renderInlineToken(theme: InkTheme, token: Token, key: string): ReactNode {
@@ -225,55 +217,56 @@ function renderParagraphTokens(theme: InkTheme, tokens: Token[], key: string) {
 
 function renderTable(theme: InkTheme, token: Tokens.Table, key: string) {
   const { table } = theme.markdown;
-  const headerTexts = token.header.map((cell) => {
-    const indicator =
-      cell.align === "center"
-        ? table.centerAlignIndicator
-        : cell.align === "right"
-          ? table.rightAlignIndicator
-          : table.leftAlignIndicator;
-    return `${getInlinePlainText(cell.tokens)} ${indicator}`;
-  });
+  const headerTexts = token.header.map((cell) => getInlinePlainText(cell.tokens));
   const rowTexts = token.rows.map((row) => row.map((cell) => getInlinePlainText(cell.tokens)));
   const widths = headerTexts.map((headerText, index) =>
     Math.max(stringWidth(headerText), ...rowTexts.map((row) => stringWidth(row[index] ?? ""))),
   );
-
-  const headerLine = headerTexts
-    .map((cellText, index) =>
-      alignCell(cellText, widths[index] ?? stringWidth(cellText), token.align[index] ?? "left"),
-    )
-    .join(" | ");
-  const separatorLine = widths.map((width) => "-".repeat(width)).join("-+-");
-  const bodyLines = rowTexts.map((row) =>
-    row
-      .map((cellText, index) =>
-        alignCell(cellText, widths[index] ?? stringWidth(cellText), token.align[index] ?? null),
-      )
-      .join(" | "),
-  );
+  const content = [
+    headerTexts.map((cellText, index) =>
+      createTableCell(
+        alignCell(cellText, widths[index] ?? stringWidth(cellText), token.align[index] ?? "left"),
+        table.headerForeground,
+      ),
+    ),
+    ...rowTexts.map((row) =>
+      row.map((cellText, index) =>
+        createTableCell(
+          alignCell(cellText, widths[index] ?? stringWidth(cellText), token.align[index] ?? null),
+          table.rowForeground,
+        ),
+      ),
+    ),
+  ];
+  const tableWidth =
+    widths.reduce((total, width) => total + width, 0) + Math.max(0, widths.length - 1);
 
   return (
-    <box
-      key={key}
-      width="100%"
-      marginBottom={1}
-      border
-      borderColor={table.border}
-      backgroundColor={table.background}
-      paddingX={1}
-    >
-      <text selectable>
-        <span fg={table.headerForeground}>{headerLine}</span>
-        {"\n"}
-        <span fg={table.separatorForeground}>{separatorLine}</span>
-        {bodyLines.map((line) => (
-          <Fragment key={`${key}-row-${line}`}>
-            {"\n"}
-            <span fg={table.rowForeground}>{line}</span>
-          </Fragment>
-        ))}
-      </text>
+    <box key={key} width="100%" marginBottom={1}>
+      <box
+        width={tableWidth + 2}
+        shouldFill={false}
+        alignSelf="flex-start"
+        border
+        borderColor={table.border}
+        backgroundColor={table.background}
+      >
+        {createElement("text-table", {
+          content,
+          width: tableWidth,
+          columnWidthMode: "content",
+          wrapMode: "none",
+          cellPadding: 0,
+          border: true,
+          outerBorder: false,
+          showBorders: true,
+          borderStyle: "single",
+          borderColor: table.separatorForeground,
+          borderBackgroundColor: table.background,
+          backgroundColor: table.background,
+          selectable: true,
+        })}
+      </box>
     </box>
   );
 }
@@ -439,37 +432,54 @@ function CodeBlock({ code, language, theme }: { code: string; language: string; 
     };
   }, [code, filetype, syntaxStyle]);
 
-  const label = getCodeBlockLabel(filetype);
+  const { icon } = getCodeBlockMeta(filetype);
+  const style = theme.markdown.codeBlock;
+  const header = (
+    <box
+      backgroundColor={style.headerBackground}
+      paddingX={1}
+      paddingTop={style.topSpacing}
+      paddingBottom={style.bottomSpacing}
+      border={style.separator ? ["bottom"] : undefined}
+      borderColor={style.separator ? style.border : undefined}
+    >
+      <text selectable>
+        <span fg={style.label}>{icon}</span>
+      </text>
+    </box>
+  );
+  const body = (
+    <box padding={1}>
+      <text selectable>
+        {chunks.map((chunk, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: chunks are static ordered syntax segments
+          <span key={i} fg={chunk.fg}>
+            {chunk.text}
+          </span>
+        ))}
+      </text>
+    </box>
+  );
+
+  if (!style.borderVisible) {
+    return (
+      <box width="100%" flexDirection="column" backgroundColor={style.background}>
+        {header}
+        {body}
+      </box>
+    );
+  }
 
   return (
     <box
       width="100%"
       flexDirection="column"
       border
-      borderColor={theme.markdown.codeBlock.border}
-      backgroundColor={theme.markdown.codeBlock.background}
+      borderColor={style.border}
+      backgroundColor={style.background}
     >
-      <box
-        backgroundColor={theme.markdown.codeBlock.headerBackground}
-        paddingX={1}
-        border={["bottom"]}
-        borderColor={theme.markdown.codeBlock.border}
-      >
-        <text selectable>
-          <span fg={theme.markdown.codeBlock.label}>[{label}]</span>
-          <span fg={theme.markdown.codeBlock.language}> {filetype}</span>
-        </text>
-      </box>
-      <box padding={1}>
-        <text selectable>
-          {chunks.map((chunk, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: chunks are static ordered syntax segments
-            <span key={i} fg={chunk.fg}>
-              {chunk.text}
-            </span>
-          ))}
-        </text>
-      </box>
+      {header}
+      {body}
     </box>
   );
 }
@@ -491,6 +501,7 @@ function renderToken(theme: InkTheme, token: Token, index: number, keyPrefix = "
     }
     case "heading": {
       const style = getHeadingStyle(theme, token.depth);
+      const showIcon = style.icon.trim().length > 0;
 
       return (
         <box
@@ -498,14 +509,18 @@ function renderToken(theme: InkTheme, token: Token, index: number, keyPrefix = "
           width="100%"
           marginBottom={1}
           paddingX={1}
-          border={["bottom"]}
-          borderColor={style.border}
+          paddingTop={style.topSpacing}
+          paddingBottom={style.bottomSpacing}
+          border={style.separator ? ["bottom"] : undefined}
+          borderColor={style.separator ? style.border : undefined}
           backgroundColor={style.background}
         >
           <text selectable>
-            <span fg={style.foreground}>
-              <strong>{`${style.icon} `}</strong>
-            </span>
+            {showIcon ? (
+              <span fg={style.foreground}>
+                <strong>{`${style.icon} `}</strong>
+              </span>
+            ) : null}
             <span fg={style.foreground}>
               <strong>{renderInlineTokens(theme, token.tokens ?? [], `${key}-heading`)}</strong>
             </span>
@@ -515,12 +530,7 @@ function renderToken(theme: InkTheme, token: Token, index: number, keyPrefix = "
     }
     case "hr": {
       return (
-        <box key={key} width="100%" flexDirection="row" alignItems="center" gap={1} marginY={1}>
-          <text selectable>
-            <span fg={theme.markdown.horizontalRule.foreground}>
-              {theme.markdown.horizontalRule.icon}
-            </span>
-          </text>
+        <box key={key} width="100%" flexDirection="row" alignItems="center" marginY={1}>
           <box
             flexGrow={1}
             height={1}

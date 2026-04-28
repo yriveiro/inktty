@@ -1,10 +1,10 @@
 {
-  "name": "inktty",
+  "name": "@yriveiro/inktty",
   "version": "1.0.0",
   "type": "module",
   "description": "A simple terminal markdown reader built with OpenTUI",
   "author": "yriveiro",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/yriveiro/inktty.git"

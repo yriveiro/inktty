@@ -1,8 +1,25 @@
 {
   "name": "inktty",
   "version": "1.0.0",
-  "description": "A simple terminal markdown reader built with OpenTUI",
   "type": "module",
+  "description": "A simple terminal markdown reader built with OpenTUI",
+  "author": "yriveiro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yriveiro/inktty.git"
+  },
+  "homepage": "https://github.com/yriveiro/inktty#readme",
+  "bugs": {
+    "url": "https://github.com/yriveiro/inktty/issues"
+  },
+  "keywords": [
+    "terminal",
+    "markdown",
+    "tui",
+    "opentui",
+    "reader"
+  ],
   "bin": {
     "ink": "./bin/ink.tsx"
   },
@@ -14,7 +31,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf bun.lock"
   },
   "dependencies": {
     "@opentui/core": "0.2.0",

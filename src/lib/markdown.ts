@@ -1,9 +1,17 @@
 import { marked, type Token } from "marked";
+import { resolveFenceLanguage } from "./highlight";
+import { isMermaidFenceLanguage } from "./mermaid";
 
 export interface FencedCodeBlock {
   code: string;
   codeLines: string[];
   infoString?: string;
+  startLine: number;
+}
+
+export interface MermaidBlock {
+  code: string;
+  index: number;
   startLine: number;
 }
 
@@ -28,10 +36,11 @@ export function extractFencedCodeBlocks(source: string): FencedCodeBlock[] {
     const raw = token.raw ?? "";
 
     if (token.type === "code" && token.codeBlockStyle !== "indented") {
-      const codeLines = raw.split("\n").slice(1, -1);
+      const code = token.text;
+      const codeLines = code.length === 0 ? [] : code.split("\n");
 
       blocks.push({
-        code: codeLines.join("\n"),
+        code,
         codeLines,
         infoString: token.lang,
         startLine: tokenStartLine,
@@ -42,6 +51,16 @@ export function extractFencedCodeBlocks(source: string): FencedCodeBlock[] {
   }
 
   return blocks;
+}
+
+export function extractMermaidBlocks(source: string): MermaidBlock[] {
+  return extractFencedCodeBlocks(source)
+    .filter((block) => isMermaidFenceLanguage(resolveFenceLanguage(block.infoString)))
+    .map((block, index) => ({
+      code: block.code,
+      index,
+      startLine: block.startLine,
+    }));
 }
 
 /**

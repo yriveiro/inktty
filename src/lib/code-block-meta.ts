@@ -3,22 +3,23 @@ interface CodeBlockMeta {
 }
 
 const codeBlockMetaByFiletype: Record<string, CodeBlockMeta> = {
-  bash: { icon: "" },
-  fish: { icon: "" },
-  java: { icon: "" },
-  javascript: { icon: "" },
-  javascriptreact: { icon: "" },
-  json: { icon: "" },
-  python: { icon: "" },
-  rego: { icon: "󱁢" },
-  shell: { icon: "" },
-  sh: { icon: "" },
-  text: { icon: "󰈙" },
-  typescript: { icon: "" },
+  bash: { icon: "" },
+  fish: { icon: "" },
+  java: { icon: "󰬷" },
+  javascript: { icon: "󰌞" },
+  javascriptreact: { icon: "" },
+  json: { icon: "󰘦" },
+  mermaid: { icon: "󰫺" },
+  python: { icon: "󰌠" },
+  rego: { icon: "󰫿" },
+  shell: { icon: "" },
+  sh: { icon: "" },
+  text: { icon: "󰦪" },
+  typescript: { icon: "󰛦" },
   typescriptreact: { icon: "" },
-  yaml: { icon: "" },
-  yml: { icon: "" },
-  zsh: { icon: "" },
+  yaml: { icon: "" },
+  yml: { icon: "" },
+  zsh: { icon: "" },
 };
 
 const defaultCodeBlockMeta: CodeBlockMeta = {

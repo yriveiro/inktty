@@ -13,6 +13,92 @@ export async function testRender(node: ReactNode, testRendererOptions: TestRende
 
   return {
     ...testSetup,
+    mockMouse: {
+      moveTo: async (
+        x: number,
+        y: number,
+        options?: Parameters<typeof testSetup.mockMouse.moveTo>[2],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.moveTo(x, y, options);
+        });
+      },
+      click: async (
+        x: number,
+        y: number,
+        button?: Parameters<typeof testSetup.mockMouse.click>[2],
+        options?: Parameters<typeof testSetup.mockMouse.click>[3],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.click(x, y, button, options);
+        });
+      },
+      doubleClick: async (
+        x: number,
+        y: number,
+        button?: Parameters<typeof testSetup.mockMouse.doubleClick>[2],
+        options?: Parameters<typeof testSetup.mockMouse.doubleClick>[3],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.doubleClick(x, y, button, options);
+        });
+      },
+      pressDown: async (
+        x: number,
+        y: number,
+        button?: Parameters<typeof testSetup.mockMouse.pressDown>[2],
+        options?: Parameters<typeof testSetup.mockMouse.pressDown>[3],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.pressDown(x, y, button, options);
+        });
+      },
+      release: async (
+        x: number,
+        y: number,
+        button?: Parameters<typeof testSetup.mockMouse.release>[2],
+        options?: Parameters<typeof testSetup.mockMouse.release>[3],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.release(x, y, button, options);
+        });
+      },
+      drag: async (
+        startX: number,
+        startY: number,
+        endX: number,
+        endY: number,
+        button?: Parameters<typeof testSetup.mockMouse.drag>[4],
+        options?: Parameters<typeof testSetup.mockMouse.drag>[5],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.drag(startX, startY, endX, endY, button, options);
+        });
+      },
+      scroll: async (
+        x: number,
+        y: number,
+        direction: Parameters<typeof testSetup.mockMouse.scroll>[2],
+        options?: Parameters<typeof testSetup.mockMouse.scroll>[3],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.scroll(x, y, direction, options);
+        });
+      },
+      getCurrentPosition: testSetup.mockMouse.getCurrentPosition,
+      getPressedButtons: testSetup.mockMouse.getPressedButtons,
+      emitMouseEvent: async (
+        type: Parameters<typeof testSetup.mockMouse.emitMouseEvent>[0],
+        x: number,
+        y: number,
+        button?: Parameters<typeof testSetup.mockMouse.emitMouseEvent>[3],
+        options?: Parameters<typeof testSetup.mockMouse.emitMouseEvent>[4],
+      ) => {
+        await act(async () => {
+          await testSetup.mockMouse.emitMouseEvent(type, x, y, button, options);
+        });
+      },
+    },
     renderOnce: async () => {
       await act(async () => {
         await testSetup.renderOnce();
@@ -41,9 +127,12 @@ export async function pause(ms: number): Promise<void> {
 }
 
 export async function renderFrame(testSetup: TestSetup): Promise<string> {
-  await testSetup.renderOnce();
-  await pause(100);
-  await testSetup.renderOnce();
+  await act(async () => {
+    await testSetup.renderOnce();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    await testSetup.renderOnce();
+  });
+
   return testSetup.captureCharFrame();
 }
 

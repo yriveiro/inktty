@@ -14,8 +14,10 @@ interface AppProps {
 export function App({ fileName, content, themes, initialThemeName }: AppProps) {
   const { width } = useTerminalDimensions();
   const {
+    activateMermaid,
     copied,
     filePercent,
+    focusedMermaidIndex,
     mode,
     scrollRestoreRequest,
     scrollboxRef,
@@ -65,6 +67,10 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
     ["u", "1/2 page up", "esc", "close help"],
     ["d", "1/2 page down", "tab", "toggle view/code"],
   ];
+
+  if (mode === "view") {
+    helpRows.push([",/.", "prev/next png", "v", "open png"]);
+  }
 
   if (themeNames.length > 1) {
     helpRows.push(["t/T", "cycle theme", "q", "quit"]);
@@ -152,7 +158,9 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
     <box flexDirection="column" width="100%" height="100%">
       <MarkdownReader
         content={content}
+        focusedMermaidIndex={focusedMermaidIndex}
         mode={mode}
+        onMermaidAction={activateMermaid}
         showLineNumbers={showLineNumbers}
         softWrap={softWrap}
         horizontalOffset={horizontalOffset}

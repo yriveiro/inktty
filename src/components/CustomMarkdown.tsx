@@ -11,12 +11,22 @@ import {
   resolveFenceLanguage,
 } from "../lib/highlight";
 import { lexMarkdown } from "../lib/markdown";
+import {
+  hasMermaidCli,
+  isMermaidFenceLanguage,
+  openMermaidPng,
+  renderMermaidDiagram,
+} from "../lib/mermaid";
 import type { CalloutTheme, InkTheme, LinkTheme } from "../lib/theme";
 
 interface CustomMarkdownProps {
   content: string;
+  focusedMermaidIndex?: number | null;
+  onMermaidAction?: (index: number, code: string) => void;
   theme: InkTheme;
 }
+
+const mermaidActionIcon = "";
 
 let textTableRegistered = false;
 
@@ -406,13 +416,47 @@ function renderBlockquote(theme: InkTheme, token: Tokens.Blockquote, key: string
   );
 }
 
-function CodeBlock({ code, language, theme }: { code: string; language: string; theme: InkTheme }) {
+function CodeBlock({
+  code,
+  focusedMermaidIndex,
+  language,
+  mermaidIndex,
+  onMermaidAction,
+  theme,
+}: {
+  code: string;
+  focusedMermaidIndex?: number | null;
+  language: string;
+  mermaidIndex?: number;
+  onMermaidAction?: (index: number, code: string) => void;
+  theme: InkTheme;
+}) {
   const filetype = resolveFenceLanguage(language);
+  const isMermaid = isMermaidFenceLanguage(filetype);
   const syntaxStyle = useMemo(() => createSyntaxStyle(theme), [theme]);
   const [chunks, setChunks] = useState<HighlightChunk[]>([{ text: code, attributes: 0 }]);
+  const [isMermaidActionHovered, setIsMermaidActionHovered] = useState(false);
+  const renderedMermaid = useMemo(() => {
+    if (!isMermaid) {
+      return null;
+    }
+
+    try {
+      return renderMermaidDiagram(code);
+    } catch (_e) {
+      return null;
+    }
+  }, [code, isMermaid]);
+  const mermaidCliAvailable = isMermaid && renderedMermaid ? hasMermaidCli() : false;
 
   useEffect(() => {
+    if (isMermaid) {
+      return;
+    }
+
     let cancelled = false;
+
+    setChunks([{ text: code, attributes: 0 }]);
 
     async function highlight() {
       try {
@@ -430,34 +474,78 @@ function CodeBlock({ code, language, theme }: { code: string; language: string; 
     return () => {
       cancelled = true;
     };
-  }, [code, filetype, syntaxStyle]);
+  }, [code, filetype, isMermaid, syntaxStyle]);
 
   const { icon } = getCodeBlockMeta(filetype);
   const style = theme.markdown.codeBlock;
+  const mermaidActionActive = mermaidIndex !== undefined && focusedMermaidIndex === mermaidIndex;
+  const mermaidActionExpanded = mermaidActionActive || isMermaidActionHovered;
+  const mermaidAction =
+    !isMermaid || !renderedMermaid ? null : mermaidCliAvailable ? (
+      // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI uses non-DOM JSX; box is the interactive container primitive here.
+      // biome-ignore lint/a11y/useKeyWithMouseEvents: OpenTUI hover interactions do not map to DOM focus semantics; keyboard selection is handled separately.
+      <box
+        id={mermaidIndex === undefined ? undefined : `mermaid-png-action-${mermaidIndex}`}
+        shouldFill={false}
+        onMouseOver={() => {
+          setIsMermaidActionHovered(true);
+        }}
+        onMouseOut={() => {
+          setIsMermaidActionHovered(false);
+        }}
+        onMouseUp={() => {
+          if (mermaidIndex !== undefined) {
+            onMermaidAction?.(mermaidIndex, code);
+            return;
+          }
+
+          void openMermaidPng(code);
+        }}
+      >
+        <text selectable>
+          <span fg={mermaidActionActive ? style.label : theme.markdown.links.path.foreground}>
+            {mermaidActionExpanded ? `${mermaidActionIcon} view` : mermaidActionIcon}
+          </span>
+        </text>
+      </box>
+    ) : (
+      <text selectable>
+        <span fg={theme.markdown.links.path.foreground}>mermaid-cli required</span>
+      </text>
+    );
   const header = (
     <box
+      width="100%"
       backgroundColor={style.headerBackground}
       paddingX={1}
       paddingTop={style.topSpacing}
       paddingBottom={style.bottomSpacing}
+      flexDirection="row"
+      justifyContent="space-between"
       border={style.separator ? ["bottom"] : undefined}
       borderColor={style.separator ? style.border : undefined}
     >
       <text selectable>
         <span fg={style.label}>{icon}</span>
+        <span fg={style.language}>{` ${filetype}`}</span>
       </text>
+      {mermaidAction}
     </box>
   );
   const body = (
     <box padding={1}>
-      <text selectable>
-        {chunks.map((chunk, i) => (
-          // biome-ignore lint/suspicious/noArrayIndexKey: chunks are static ordered syntax segments
-          <span key={i} fg={chunk.fg}>
-            {chunk.text}
-          </span>
-        ))}
-      </text>
+      {isMermaid && renderedMermaid ? (
+        <text selectable>{renderedMermaid}</text>
+      ) : (
+        <text selectable>
+          {chunks.map((chunk, i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: chunks are static ordered syntax segments
+            <span key={i} fg={chunk.fg}>
+              {chunk.text}
+            </span>
+          ))}
+        </text>
+      )}
     </box>
   );
 
@@ -484,7 +572,14 @@ function CodeBlock({ code, language, theme }: { code: string; language: string; 
   );
 }
 
-function renderToken(theme: InkTheme, token: Token, index: number, keyPrefix = "token"): ReactNode {
+function renderToken(
+  theme: InkTheme,
+  token: Token,
+  index: number,
+  keyPrefix = "token",
+  mermaidState: { nextIndex: number; focusedIndex?: number | null } = { nextIndex: 0 },
+  onMermaidAction?: (index: number, code: string) => void,
+): ReactNode {
   const key = `${keyPrefix}-${index}`;
   const syntaxStyle = createSyntaxStyle(theme);
 
@@ -493,9 +588,21 @@ function renderToken(theme: InkTheme, token: Token, index: number, keyPrefix = "
       return renderBlockquote(theme, token as Tokens.Blockquote, key);
     }
     case "code": {
+      const language = token.lang || "text";
+      const mermaidIndex = isMermaidFenceLanguage(resolveFenceLanguage(language))
+        ? mermaidState.nextIndex++
+        : undefined;
+
       return (
         <box key={key} marginBottom={1}>
-          <CodeBlock code={token.text} language={token.lang || "text"} theme={theme} />
+          <CodeBlock
+            code={token.text}
+            focusedMermaidIndex={mermaidState.focusedIndex}
+            language={language}
+            mermaidIndex={mermaidIndex}
+            onMermaidAction={onMermaidAction}
+            theme={theme}
+          />
         </box>
       );
     }
@@ -561,12 +668,26 @@ function renderToken(theme: InkTheme, token: Token, index: number, keyPrefix = "
   }
 }
 
-function renderBlocks(theme: InkTheme, tokens: Token[], keyPrefix: string): ReactNode[] {
-  return tokens.map((token, index) => renderToken(theme, token, index, keyPrefix));
+function renderBlocks(
+  theme: InkTheme,
+  tokens: Token[],
+  keyPrefix: string,
+  mermaidState: { nextIndex: number; focusedIndex?: number | null } = { nextIndex: 0 },
+  onMermaidAction?: (index: number, code: string) => void,
+): ReactNode[] {
+  return tokens.map((token, index) =>
+    renderToken(theme, token, index, keyPrefix, mermaidState, onMermaidAction),
+  );
 }
 
-export function CustomMarkdown({ content, theme }: CustomMarkdownProps) {
+export function CustomMarkdown({
+  content,
+  focusedMermaidIndex,
+  onMermaidAction,
+  theme,
+}: CustomMarkdownProps) {
   const tokens = lexMarkdown(content);
+  const mermaidState = { focusedIndex: focusedMermaidIndex, nextIndex: 0 };
 
-  return <>{renderBlocks(theme, tokens, "root")}</>;
+  return <>{renderBlocks(theme, tokens, "root", mermaidState, onMermaidAction)}</>;
 }

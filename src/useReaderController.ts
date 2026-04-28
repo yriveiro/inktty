@@ -3,7 +3,8 @@ import { useKeyboard, useRenderer } from "@opentui/react";
 import { type RefObject, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScrollRestoreRequest } from "./components/MarkdownReader";
 import { stringWidth } from "./lib/display";
-import { normalizeMarkdownSource } from "./lib/markdown";
+import { extractMermaidBlocks, normalizeMarkdownSource } from "./lib/markdown";
+import { openMermaidPng } from "./lib/mermaid";
 import { defaultTheme, type InkTheme, listThemeNames, resolveThemeByName } from "./lib/theme";
 
 interface UseReaderControllerOptions {
@@ -13,8 +14,10 @@ interface UseReaderControllerOptions {
 }
 
 interface ReaderControllerState {
+  activateMermaid: (index: number, code: string) => void;
   copied: boolean;
   filePercent: number;
+  focusedMermaidIndex: number | null;
   mode: "view" | "code";
   scrollRestoreRequest: ScrollRestoreRequest | null;
   scrollboxRef: RefObject<ScrollBoxRenderable | null>;
@@ -45,6 +48,7 @@ export function useReaderController({
   const [copied, setCopied] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [scrollTop, setScrollTop] = useState(0);
+  const [focusedMermaidIndex, setFocusedMermaidIndex] = useState<number | null>(null);
   const [scrollRestoreRequest, setScrollRestoreRequest] = useState<ScrollRestoreRequest | null>(
     null,
   );
@@ -55,6 +59,7 @@ export function useReaderController({
     () => resolveThemeByName(availableThemes, activeThemeName),
     [activeThemeName, availableThemes],
   );
+  const mermaidBlocks = useMemo(() => extractMermaidBlocks(content), [content]);
 
   function cycleTheme(step: number): void {
     if (themeNames.length < 2) {
@@ -156,6 +161,92 @@ export function useReaderController({
     scheduleScrollTopSync();
   }
 
+  function getVisibleMermaidIndices(): number[] {
+    const scrollbox = scrollboxRef.current;
+    const viewport = scrollbox?.viewport;
+
+    if (!scrollbox || !viewport) {
+      return [];
+    }
+
+    const viewportTop = viewport.screenY;
+    const viewportBottom = viewportTop + viewport.height - 1;
+
+    return mermaidBlocks
+      .filter((block) => {
+        const renderable = scrollbox.findDescendantById(`mermaid-png-action-${block.index}`);
+
+        if (!renderable) {
+          return false;
+        }
+
+        const renderableTop = renderable.screenY;
+        const renderableBottom = renderable.screenY + renderable.height - 1;
+
+        return renderableBottom >= viewportTop && renderableTop <= viewportBottom;
+      })
+      .map((block) => block.index);
+  }
+
+  function focusMermaidBlock(index: number): void {
+    const scrollbox = scrollboxRef.current;
+
+    if (!scrollbox) {
+      return;
+    }
+
+    scrollbox.scrollChildIntoView(`mermaid-png-action-${index}`);
+    setFocusedMermaidIndex(index);
+    scheduleScrollTopSync();
+  }
+
+  function getActiveMermaidIndex(): number | null {
+    if (
+      focusedMermaidIndex !== null &&
+      mermaidBlocks.some((block) => block.index === focusedMermaidIndex)
+    ) {
+      return focusedMermaidIndex;
+    }
+
+    return getVisibleMermaidIndices()[0] ?? mermaidBlocks[0]?.index ?? null;
+  }
+
+  function navigateMermaid(direction: -1 | 1): void {
+    if (mode !== "view" || mermaidBlocks.length === 0) {
+      return;
+    }
+
+    const currentIndex = getActiveMermaidIndex();
+
+    if (currentIndex === null) {
+      return;
+    }
+
+    const currentPosition = mermaidBlocks.findIndex((block) => block.index === currentIndex);
+
+    if (currentPosition === -1) {
+      return;
+    }
+
+    const nextPosition = Math.min(
+      Math.max(0, currentPosition + direction),
+      mermaidBlocks.length - 1,
+    );
+    const nextIndex = mermaidBlocks[nextPosition]?.index;
+
+    if (nextIndex === undefined) {
+      return;
+    }
+
+    focusMermaidBlock(nextIndex);
+  }
+
+  function activateMermaid(index: number, code: string): void {
+    setFocusedMermaidIndex(index);
+    scheduleScrollTopSync();
+    void openMermaidPng(code);
+  }
+
   const flashCopied = useCallback((): void => {
     setCopied(true);
 
@@ -176,6 +267,14 @@ export function useReaderController({
       setActiveThemeName(resolvedThemeName);
     }
   }, [activeThemeName, availableThemes]);
+
+  useEffect(() => {
+    setFocusedMermaidIndex((currentIndex) =>
+      currentIndex !== null && mermaidBlocks.some((block) => block.index === currentIndex)
+        ? currentIndex
+        : null,
+    );
+  }, [mermaidBlocks]);
 
   useKeyboard((key) => {
     const isHelpToggle = key.sequence === "?" || (key.shift && key.name === "/");
@@ -229,6 +328,26 @@ export function useReaderController({
     if (key.name === "d") {
       scrollByViewport(0.5);
       return;
+    }
+
+    if (key.sequence === ",") {
+      navigateMermaid(-1);
+      return;
+    }
+
+    if (key.sequence === ".") {
+      navigateMermaid(1);
+      return;
+    }
+
+    if (key.name === "v") {
+      const activeMermaidIndex = getActiveMermaidIndex();
+      const activeMermaidBlock = mermaidBlocks.find((block) => block.index === activeMermaidIndex);
+
+      if (mode === "view" && activeMermaidBlock) {
+        activateMermaid(activeMermaidBlock.index, activeMermaidBlock.code);
+        return;
+      }
     }
 
     if (key.name === "tab") {
@@ -326,8 +445,10 @@ export function useReaderController({
   })();
 
   return {
+    activateMermaid,
     copied,
     filePercent,
+    focusedMermaidIndex,
     mode,
     scrollRestoreRequest,
     scrollboxRef,

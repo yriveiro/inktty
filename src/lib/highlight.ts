@@ -86,6 +86,7 @@ const fenceLanguageAliases: Record<string, string> = {
   sh: "bash",
   zsh: "bash",
   fish: "bash",
+  mermaid: "mermaid",
   yml: "yaml",
   yaml: "yaml",
   json: "json",

@@ -10,7 +10,9 @@ export interface ScrollRestoreRequest {
 
 interface MarkdownReaderProps {
   content: string;
+  focusedMermaidIndex?: number | null;
   mode: "view" | "code";
+  onMermaidAction?: (index: number, code: string) => void;
   showLineNumbers: boolean;
   softWrap: boolean;
   horizontalOffset: number;
@@ -21,7 +23,9 @@ interface MarkdownReaderProps {
 
 export function MarkdownReader({
   content,
+  focusedMermaidIndex,
   mode,
+  onMermaidAction,
   showLineNumbers,
   softWrap,
   horizontalOffset,
@@ -55,7 +59,12 @@ export function MarkdownReader({
       }}
     >
       {mode === "view" ? (
-        <CustomMarkdown content={content} theme={theme} />
+        <CustomMarkdown
+          content={content}
+          focusedMermaidIndex={focusedMermaidIndex}
+          onMermaidAction={onMermaidAction}
+          theme={theme}
+        />
       ) : (
         <CodeModeView
           content={content}

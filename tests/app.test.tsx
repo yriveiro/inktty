@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { App } from "../src/App";
+import { exportMermaidPng, hasMermaidCli } from "../src/lib/mermaid";
 import { getEmbeddedThemes, type InkTheme } from "../src/lib/theme";
 import {
   destroyTestSetup,
@@ -65,9 +66,27 @@ afterEach(async () => {
     await destroyTestSetup(testSetup);
     testSetup = undefined;
   }
+
+  mock.restore();
 });
 
 describe("App", () => {
+  describe("mermaid png export", () => {
+    test("exports mermaid diagrams to a png file url", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const url = await exportMermaidPng("flowchart TD\nA[Start]-->B[Done]\n");
+
+      expect(url).toMatch(/^file:\/\/.+\.png$/);
+      expect(await Bun.file(new URL(url)).arrayBuffer()).not.toHaveLength(0);
+      const svgPath = new URL(`${url}.svg`);
+
+      expect(await Bun.file(svgPath).exists()).toBe(false);
+    });
+  });
+
   describe("footer chrome", () => {
     test("displays the filename", async () => {
       const setup = await renderApp("# Hello", "README.md");
@@ -191,7 +210,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
-      expect(await renderFrame(setup)).toContain("");
+      expect(await renderFrame(setup)).toContain(" bash");
       expect(rgb(findSpanOnLine(setup, /if true; then/, "if"))).toEqual([122, 162, 247]);
       expect(rgb(findSpanOnLine(setup, /echo "hi"/, '"hi"'))).toEqual([158, 206, 106]);
     });
@@ -203,7 +222,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
-      expect(await renderFrame(setup)).toContain("");
+      expect(await renderFrame(setup)).toContain(" yaml");
       expect(rgb(findSpanOnLine(setup, /name: sample-app/, ":"))).toEqual([169, 177, 214]);
       expect(rgb(findSpanOnLine(setup, /name: sample-app/, "sample-app"))).toEqual([158, 206, 106]);
     });
@@ -215,7 +234,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
-      expect(await renderFrame(setup)).toContain("");
+      expect(await renderFrame(setup)).toContain("󰘦 json");
       expect(rgb(findSpanOnLine(setup, /inktty/, '"inktty"'))).toEqual([158, 206, 106]);
     });
 
@@ -227,7 +246,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
-      expect(await renderFrame(setup)).toContain("");
+      expect(await renderFrame(setup)).toContain("󰬷 java");
       expect(rgb(findSpanOnLine(setup, /class Hello/, "class"))).toEqual([122, 162, 247]);
       expect(rgb(findSpanOnLine(setup, /return "hi";/, '"hi"'))).toEqual([158, 206, 106]);
     });
@@ -239,7 +258,7 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
-      expect(await renderFrame(setup)).toContain("󱁢");
+      expect(await renderFrame(setup)).toContain("󰫿 rego");
       expect(rgb(findSpanOnLine(setup, /default allow := false/, "default"))).toEqual([
         122, 162, 247,
       ]);
@@ -255,7 +274,320 @@ describe("App", () => {
       await pause(100);
       await setup.renderOnce();
 
-      expect(await renderFrame(setup)).toContain("");
+      expect(await renderFrame(setup)).toContain("󰌠 python");
+    });
+
+    test("renders mermaid fenced code blocks as glyph diagrams", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const setup = await renderApp("```mermaid\nflowchart TD\nA[Start]-->B[Done]\n```");
+      const frame = await renderFrame(setup);
+
+      expect(frame).toContain("󰫺 mermaid");
+      expect(frame).toContain("");
+      expect(frame).toContain("Start");
+      expect(frame).toContain("Done");
+      expect(frame).toContain("▼");
+      expect(frame).toContain("┌");
+      expect(frame).toMatch(/󰫺 mermaid\s+/);
+    });
+
+    test("keeps the mermaid png action available after toggling code and view modes", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const setup = await renderApp(
+        "```mermaid\nflowchart TD\nA[Start]-->B[Done]\n```",
+        "toggle.md",
+        80,
+        24,
+      );
+      const openSpy = spyOn(Bun, "spawn");
+      let frame = await renderFrame(setup);
+
+      await pressKey(setup, "tab", "\t");
+      await renderFrame(setup);
+      await pressKey(setup, "tab", "\t");
+      frame = await renderFrame(setup);
+
+      expect(frame).toContain("");
+
+      await pressKey(setup, "v");
+
+      for (let i = 0; i < 20 && openSpy.mock.calls.length === 0; i += 1) {
+        await pause(50);
+      }
+
+      expect(openSpy).toHaveBeenCalledWith(
+        ["open", expect.stringMatching(/diagram-.+\.png$/)],
+        expect.objectContaining({ stderr: "ignore", stdout: "ignore" }),
+      );
+    });
+
+    test("navigates to the next visible mermaid png entry with .", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const content = [
+        "```mermaid",
+        "flowchart TD",
+        "A[One]-->B[Two]",
+        "```",
+        "",
+        "padding 1",
+        "",
+        "padding 2",
+        "",
+        "padding 3",
+        "",
+        "```mermaid",
+        "flowchart TD",
+        "C[Three]-->D[Four]",
+        "```",
+      ].join("\n");
+      const setup = await renderApp(content, "multi-mermaid.md", 80, 12);
+
+      let frame = await renderFrame(setup);
+      expect(frame).toMatch(/󰫺 mermaid\s+/);
+      const initialScrollTop = getScrollbox(setup)?.scrollTop ?? 0;
+
+      await pressKey(setup, ".", ".");
+      frame = await renderFrame(setup);
+
+      expect(frame).toContain(" view");
+      expect(frame).toContain("padding 3");
+      expect(getScrollbox(setup)?.scrollTop).toBeGreaterThan(initialScrollTop);
+      expect(frame).toContain("Inktty | multi-mermaid.md | tokyo-night | view y:");
+    });
+
+    test("navigates back to the previous mermaid png entry with ,", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const content = [
+        "```mermaid",
+        "flowchart TD",
+        "A[One]-->B[Two]",
+        "```",
+        "",
+        "padding 1",
+        "",
+        "padding 2",
+        "",
+        "padding 3",
+        "",
+        "```mermaid",
+        "flowchart TD",
+        "C[Three]-->D[Four]",
+        "```",
+      ].join("\n");
+      const setup = await renderApp(content, "multi-mermaid.md", 80, 12);
+
+      await renderFrame(setup);
+      await pressKey(setup, ".", ".");
+      await renderFrame(setup);
+      await pressKey(setup, ",", ",");
+
+      const frame = await renderFrame(setup);
+
+      expect(frame).toContain("One");
+      expect(frame).toContain("Two");
+      expect(frame).not.toContain("Three");
+    });
+
+    test("opens the selected mermaid png entry with v", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const content = [
+        "```mermaid",
+        "flowchart TD",
+        "A[One]-->B[Two]",
+        "```",
+        "",
+        "padding 1",
+        "",
+        "padding 2",
+        "",
+        "padding 3",
+        "",
+        "```mermaid",
+        "flowchart TD",
+        "C[Three]-->D[Four]",
+        "```",
+      ].join("\n");
+      const setup = await renderApp(content, "multi-mermaid.md", 80, 12);
+      const openSpy = spyOn(Bun, "spawn");
+
+      await renderFrame(setup);
+      await pressKey(setup, ".", ".");
+      await renderFrame(setup);
+      await pressKey(setup, "v");
+
+      for (let i = 0; i < 20 && openSpy.mock.calls.length === 0; i += 1) {
+        await pause(50);
+      }
+
+      expect(openSpy).toHaveBeenCalledWith(
+        ["open", expect.stringMatching(/diagram-.+\.png$/)],
+        expect.objectContaining({ stderr: "ignore", stdout: "ignore" }),
+      );
+    });
+
+    test("opens mermaid png entries with v when the fence has extra info-string metadata", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const setup = await renderApp(
+        ["```mermaid title=demo", "flowchart TD", "A[One]-->B[Two]", "```"].join("\n"),
+        "mermaid-metadata.md",
+        80,
+        24,
+      );
+      const openSpy = spyOn(Bun, "spawn");
+
+      await renderFrame(setup);
+      await pressKey(setup, "v");
+
+      for (let i = 0; i < 20 && openSpy.mock.calls.length === 0; i += 1) {
+        await pause(50);
+      }
+
+      expect(openSpy).toHaveBeenCalledWith(
+        ["open", expect.stringMatching(/diagram-.+\.png$/)],
+        expect.objectContaining({ stderr: "ignore", stdout: "ignore" }),
+      );
+    });
+
+    test("opens mermaid png entries with v when the document ends with a trailing newline", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const setup = await renderApp(
+        "```mermaid\nflowchart TD\nA[One]-->B[Two]\n```\n",
+        "trailing-newline-mermaid.md",
+        80,
+        24,
+      );
+      const openSpy = spyOn(Bun, "spawn");
+
+      await renderFrame(setup);
+      await pressKey(setup, "v");
+
+      for (let i = 0; i < 20 && openSpy.mock.calls.length === 0; i += 1) {
+        await pause(50);
+      }
+
+      expect(openSpy).toHaveBeenCalledWith(
+        ["open", expect.stringMatching(/diagram-.+\.png$/)],
+        expect.objectContaining({ stderr: "ignore", stdout: "ignore" }),
+      );
+    });
+
+    test("keeps the only mermaid png entry selected when navigating with , and .", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const setup = await renderApp(
+        "```mermaid\nflowchart TD\nA[One]-->B[Two]\n```",
+        "single-mermaid.md",
+        80,
+        24,
+      );
+      const initialScrollTop = getScrollbox(setup)?.scrollTop ?? 0;
+
+      await renderFrame(setup);
+      await pressKey(setup, ".", ".");
+      let frame = await renderFrame(setup);
+
+      expect(frame).toContain(" view");
+      expect(rgb(findSpanOnLine(setup, /󰫺 mermaid\s+ view/, " view"))).toEqual([122, 162, 247]);
+      expect(getScrollbox(setup)?.scrollTop ?? 0).toBe(initialScrollTop);
+
+      await pressKey(setup, ".", ".");
+      frame = await renderFrame(setup);
+
+      expect(frame).toContain(" view");
+      expect(rgb(findSpanOnLine(setup, /󰫺 mermaid\s+ view/, " view"))).toEqual([122, 162, 247]);
+      expect(getScrollbox(setup)?.scrollTop ?? 0).toBe(initialScrollTop);
+
+      await pressKey(setup, ",", ",");
+      frame = await renderFrame(setup);
+
+      expect(frame).toContain(" view");
+      expect(rgb(findSpanOnLine(setup, /󰫺 mermaid\s+ view/, " view"))).toEqual([122, 162, 247]);
+      expect(getScrollbox(setup)?.scrollTop ?? 0).toBe(initialScrollTop);
+    });
+
+    test("expands the mermaid action label on mouse hover", async () => {
+      if (!hasMermaidCli()) {
+        return;
+      }
+
+      const setup = await renderApp(
+        "```mermaid\nflowchart TD\nA[Start]-->B[Done]\n```",
+        "hover-mermaid.md",
+        80,
+        24,
+      );
+
+      let frame = await renderFrame(setup);
+      expect(frame).toContain("");
+      expect(frame).not.toContain(" view");
+
+      const mermaidAction = setup.renderer.root.findDescendantById("mermaid-png-action-0");
+
+      expect(mermaidAction?.screenX).toBeDefined();
+      expect(mermaidAction?.screenY).toBeDefined();
+
+      if (!mermaidAction) {
+        throw new Error("Missing Mermaid action renderable");
+      }
+
+      await setup.mockMouse.moveTo(mermaidAction.screenX, mermaidAction.screenY);
+      frame = await renderFrame(setup);
+
+      expect(frame).toContain(" view");
+      expect(rgb(findSpanOnLine(setup, /󰫺 mermaid\s+ view/, " view"))).toEqual([42, 195, 222]);
+    });
+
+    test("shows mermaid-cli required when the cli is unavailable", async () => {
+      const whichSpy = spyOn(Bun, "which").mockReturnValue(null);
+
+      try {
+        const setup = await renderApp("```mermaid\nflowchart TD\nA[Start]-->B[Done]\n```");
+        const frame = await renderFrame(setup);
+
+        expect(frame).toContain("󰫺 mermaid");
+        expect(frame).toContain("mermaid-cli required");
+        expect(frame).not.toContain("[png]");
+      } finally {
+        whichSpy.mockRestore();
+      }
+    });
+
+    test("falls back to raw source when mermaid rendering fails", async () => {
+      const setup = await renderApp(
+        "```mermaid\nnot really mermaid\n```",
+        "broken-mermaid.md",
+        80,
+        16,
+      );
+
+      const frame = await renderFrame(setup);
+
+      expect(frame).toContain("󰫺 mermaid");
+      expect(frame).not.toContain("[png]");
+      expect(frame).toContain("not really mermaid");
     });
 
     test("honors code block theme overrides for border, separator, and icon spacing", async () => {
@@ -278,9 +610,9 @@ describe("App", () => {
 
       const frame = await renderFrame(setup);
       const lines = frame.split("\n");
-      const iconLineIndex = lines.findIndex((line) => line.includes(""));
+      const iconLineIndex = lines.findIndex((line) => line.includes(" bash"));
 
-      expect(frame).toContain("");
+      expect(frame).toContain(" bash");
       expect(frame).not.toMatch(/[─│┌┐└┘]/);
       expect(iconLineIndex).toBeGreaterThan(0);
       expect(lines[iconLineIndex - 1]?.trim()).toBe("");

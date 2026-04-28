@@ -581,7 +581,6 @@ function renderToken(
   onMermaidAction?: (index: number, code: string) => void,
 ): ReactNode {
   const key = `${keyPrefix}-${index}`;
-  const syntaxStyle = createSyntaxStyle(theme);
 
   switch (token.type) {
     case "blockquote": {
@@ -663,7 +662,7 @@ function renderToken(
       return renderParagraphTokens(theme, toInlineTokens(token), key);
     }
     default: {
-      return <markdown key={key} content={token.raw} syntaxStyle={syntaxStyle} />;
+      return <markdown key={key} content={token.raw} syntaxStyle={createSyntaxStyle(theme)} />;
     }
   }
 }

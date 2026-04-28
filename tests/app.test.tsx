@@ -994,6 +994,27 @@ describe("App", () => {
       expect(frame).not.toContain("Line 1\n");
       expect(getScrollbox(setup)?.scrollTop).toBe(scrollTopBeforeToggle ?? 0);
     });
+
+    test("repeated toggles preserve scroll position at the same offset", async () => {
+      const content = Array.from({ length: 16 }, (_, i) => `Line ${i + 1}`).join("\n\n");
+      const setup = await renderApp(content, "scroll-repeat.md", 40, 6);
+
+      await renderFrame(setup);
+      await pressKey(setup, "j");
+      await pressKey(setup, "j");
+
+      const scrollTop = getScrollbox(setup)?.scrollTop ?? 0;
+      expect(scrollTop).toBeGreaterThan(0);
+
+      for (let i = 0; i < 3; i += 1) {
+        await pressKey(setup, "tab", "\t");
+        const frame = await renderFrame(setup);
+
+        expect(frame).toContain("Line 2");
+        expect(frame).not.toContain("Line 1\n");
+        expect(getScrollbox(setup)?.scrollTop).toBe(scrollTop);
+      }
+    });
   });
 
   describe("copy mode", () => {

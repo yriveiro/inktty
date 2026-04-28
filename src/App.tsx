@@ -1,8 +1,8 @@
 import { useTerminalDimensions } from "@opentui/react";
 import { MarkdownReader } from "./components/MarkdownReader";
+import { useReaderController } from "./controllers/useReaderController";
 import { stringWidth } from "./lib/display";
 import type { InkTheme } from "./lib/theme";
-import { useReaderController } from "./useReaderController";
 
 interface AppProps {
   fileName: string;

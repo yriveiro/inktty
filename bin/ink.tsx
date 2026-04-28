@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 import { basename } from "node:path";
-import { type CliRenderer, createCliRenderer } from "@opentui/core";
+import { createCliRenderer } from "@opentui/core";
 import { createRoot } from "@opentui/react";
 import { App } from "../src/App";
 import { hasTheme, type InkTheme, listThemeNames, loadAvailableThemes } from "../src/lib/theme";
@@ -13,10 +13,6 @@ interface CliDependencies {
   loadThemes?: typeof loadAvailableThemes;
   createRenderer?: typeof createCliRenderer;
   createReactRoot?: typeof createRoot;
-}
-
-interface ReactRootLike {
-  render(node: React.ReactNode): void;
 }
 
 function defaultReadTextFile(filePath: string): Promise<string> {
@@ -135,7 +131,7 @@ export async function runInkCli({
     targetFps: 30,
   });
 
-  (createReactRoot(renderer as CliRenderer) as unknown as ReactRootLike).render(
+  createReactRoot(renderer).render(
     <App
       fileName={basename(filePath)}
       content={content}

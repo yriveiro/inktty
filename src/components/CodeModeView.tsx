@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { sliceTextByWidth, stringWidth } from "../lib/display";
 import {
   createSyntaxStyle,
@@ -76,7 +76,7 @@ function renderLineSegments(
   lineSegments: LineSegment[],
   fallbackText: string,
   keyPrefix: string,
-): React.ReactNode[] {
+): ReactNode[] {
   const displaySegments =
     lineSegments.length > 0
       ? lineSegments
@@ -244,7 +244,7 @@ export function CodeModeView({
     );
   }
 
-  const nodes: React.ReactNode[] = [];
+  const nodes: ReactNode[] = [];
 
   for (let i = 0; i < lines.length; i++) {
     const lineText = lines[i] ?? "";

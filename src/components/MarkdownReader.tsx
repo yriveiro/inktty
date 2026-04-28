@@ -1,17 +1,14 @@
 import type { ScrollBoxRenderable } from "@opentui/core";
 import { type RefObject, useLayoutEffect } from "react";
+import type { ReaderMode, ScrollRestoreRequest } from "../controllers/reader/types";
 import type { InkTheme } from "../lib/theme";
 import { CodeModeView } from "./CodeModeView";
 import { CustomMarkdown } from "./CustomMarkdown";
 
-export interface ScrollRestoreRequest {
-  top: number;
-}
-
 interface MarkdownReaderProps {
   content: string;
   focusedMermaidIndex?: number | null;
-  mode: "view" | "code";
+  mode: ReaderMode;
   onMermaidAction?: (index: number, code: string) => void;
   showLineNumbers: boolean;
   softWrap: boolean;
@@ -54,9 +51,7 @@ export function MarkdownReader({
       flexShrink={1}
       focused
       scrollY
-      style={{
-        viewportOptions: { padding: 1 },
-      }}
+      viewportOptions={{ padding: 1 }}
     >
       {mode === "view" ? (
         <CustomMarkdown

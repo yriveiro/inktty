@@ -143,7 +143,7 @@ export function createSyntaxStyle(theme: InkTheme): SyntaxStyle {
 
 export const syntaxStyle = createSyntaxStyle(defaultTheme);
 
-export function getHighlightingClient(): TreeSitterClient {
+function getHighlightingClient(): TreeSitterClient {
   const client = getTreeSitterClient();
 
   if (!configuredHighlightClients.has(client)) {

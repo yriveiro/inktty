@@ -5,31 +5,23 @@ A simple terminal markdown reader built with OpenTUI.
 ## Usage
 
 ```bash
-# Read a markdown file
-bun run bin/ink.tsx <path-to-file.md>
+# Install and run
+bun install
+ink <path-to-file.md>
+
+# Or run directly with bun
+bun run start -- <path-to-file.md>
 
 # Use a specific theme
-bun run bin/ink.tsx --theme nord <path-to-file.md>
+ink --theme nord <path-to-file.md>
 
 # List embedded and user themes
-bun run bin/ink.tsx --list-themes
-
-# Development (watch mode)
-bun run dev
-
-# Run tests
-bun test
-bun run test:bdd
-
-# Lint and format
-bun run lint
-bun run lint:fix
-```
+ink --list-themes
 
 ## Example
 
 ```bash
-bun run bin/ink.tsx example.md
+ink example.md
 ```
 
 ## Font Requirement

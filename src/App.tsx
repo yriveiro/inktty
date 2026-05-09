@@ -69,7 +69,7 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
   ];
 
   if (mode === "view") {
-    helpRows.push([",/.", "prev/next png", "v", "open png"]);
+    helpRows.push([",/.", "prev/next diagram", "v", "open diagram rendered"]);
   }
 
   if (themeNames.length > 1) {

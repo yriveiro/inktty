@@ -1,0 +1,22 @@
+name = "minimal-override"
+extends = "tokyo-night"
+
+[chrome]
+headerBackground = "#111827"
+helpBackground = "#0f172a"
+controls = "#93c5fd"
+fileName = "#cbd5e1"
+lineNumber = "#64748b"
+
+[markdown.inlineCode]
+background = "#0f172a"
+foreground = "#f59e0b"
+
+[markdown.links.web]
+foreground = "#22d3ee"
+icon = "=>"
+
+[syntax]
+keyword = "#60a5fa"
+string = "#86efac"
+comment = "#64748b"

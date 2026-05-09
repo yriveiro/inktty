@@ -1,0 +1,58 @@
+name = "nerd-font-icons"
+extends = "nord"
+
+[markdown.heading.h1]
+icon = "󰲡"
+foreground = "#88c0d0"
+background = "#3b4252"
+
+[markdown.heading.h2]
+icon = "󰲣"
+foreground = "#8fbcbb"
+
+[markdown.heading.h3]
+icon = "󰲥"
+foreground = "#a3be8c"
+
+[markdown.links.github]
+icon = ""
+foreground = "#88c0d0"
+
+[markdown.links.web]
+icon = "󰖟"
+foreground = "#8fbcbb"
+
+[markdown.links.mail]
+icon = "󰇮"
+foreground = "#a3be8c"
+
+[markdown.links.path]
+icon = "󰉋"
+foreground = "#81a1c1"
+
+[markdown.list]
+bullet = "󰄱"
+bulletForeground = "#88c0d0"
+
+[markdown.blockquote]
+marker = "▌"
+foreground = "#88c0d0"
+border = "#88c0d0"
+
+[markdown.callout.note]
+badge = "󰋽 NOTE"
+foreground = "#81a1c1"
+border = "#81a1c1"
+background = "#303b4a"
+
+[markdown.callout.success]
+badge = "󰄬 SUCCESS"
+foreground = "#a3be8c"
+border = "#a3be8c"
+background = "#2f3a30"
+
+[markdown.callout.warning]
+badge = "󰀪 WARNING"
+foreground = "#d08770"
+border = "#d08770"
+background = "#3c312c"

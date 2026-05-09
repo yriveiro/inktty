@@ -10,7 +10,7 @@ import {
   highlightCode,
   resolveFenceLanguage,
 } from "../lib/highlight";
-import { lexMarkdown } from "../lib/markdown";
+import { extractLeadingFrontmatter, lexMarkdown } from "../lib/markdown";
 import {
   hasMermaidCli,
   isMermaidFenceLanguage,
@@ -685,8 +685,19 @@ export function CustomMarkdown({
   onMermaidAction,
   theme,
 }: CustomMarkdownProps) {
-  const tokens = lexMarkdown(content);
+  const { content: markdownContent, frontmatter } = extractLeadingFrontmatter(content);
+  const tokens = lexMarkdown(markdownContent);
   const mermaidState = { focusedIndex: focusedMermaidIndex, nextIndex: 0 };
+  const blocks = renderBlocks(theme, tokens, "root", mermaidState, onMermaidAction);
 
-  return <>{renderBlocks(theme, tokens, "root", mermaidState, onMermaidAction)}</>;
+  return (
+    <>
+      {frontmatter !== null ? (
+        <box marginBottom={blocks.length > 0 ? 1 : 0}>
+          <CodeBlock code={frontmatter} language="yaml" theme={theme} />
+        </box>
+      ) : null}
+      {blocks}
+    </>
+  );
 }

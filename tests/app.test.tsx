@@ -151,6 +151,8 @@ describe("App", () => {
       expect(frame).toContain("toggle view/code");
       expect(frame).toContain("esc");
       expect(frame).toContain("close help");
+      expect(frame).toContain("prev/next diagram");
+      expect(frame).toContain("open diagram rendered");
       expect(frame).toContain("README.md");
       expect(frame).toContain("tokyo-night");
       expect(frame).toContain("view y:1");
@@ -169,6 +171,30 @@ describe("App", () => {
 
       expect(frame).toContain("Hello");
       expect(frame).toContain("This is bold text.");
+    });
+
+    test("renders leading frontmatter as a yaml code block instead of a heading", async () => {
+      const setup = await renderApp(
+        [
+          "---",
+          "description: Post-execution validation subagent.",
+          "mode: subagent",
+          "model: github-copilot/gpt-5.4",
+          "temperature: 0.5",
+          "permissions:",
+          "  write: deny",
+          "  edit: deny",
+          "  bash: deny",
+          "  skill: allow",
+          "---",
+        ].join("\n"),
+      );
+      const frame = await renderFrame(setup);
+
+      expect(frame).toContain(" yaml");
+      expect(frame).toContain("description: Post-execution validation subagent.");
+      expect(frame).toContain("mode: subagent");
+      expect(frame).not.toContain("## description:");
     });
 
     test("renders horizontal rules", async () => {
@@ -190,6 +216,120 @@ describe("App", () => {
 
       expect(rgb(findSpanContainingText(setup, "const"))).toEqual([122, 162, 247]);
       expect(rgb(findSpanContainingText(setup, "1"))).toEqual([255, 158, 100]);
+    });
+
+    test("highlights javascript fenced code blocks", async () => {
+      const setup = await renderApp('```javascript\nconst answer = "hi";\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain("󰌞 javascript");
+      expect(rgb(findSpanOnLine(setup, /const answer = "hi";/, "const"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /const answer = "hi";/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights csharp fenced code blocks", async () => {
+      const setup = await renderApp(
+        '```csharp\npublic class Hello {\n    public string Greet() {\n        return "hi";\n    }\n}\n```',
+      );
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain("󰌛 csharp");
+      expect(rgb(findSpanOnLine(setup, /public class Hello/, "public"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /return "hi";/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights cpp fenced code blocks", async () => {
+      const setup = await renderApp(
+        '```cpp\n#include <string>\nstd::string greet() {\n  return "hi";\n}\n```',
+      );
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" cpp");
+      expect(rgb(findSpanOnLine(setup, /return "hi";/, "return"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /return "hi";/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights php fenced code blocks", async () => {
+      const setup = await renderApp(
+        '```php\n<?php\nfunction greet(): string {\n    return "hi";\n}\n```',
+      );
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" php");
+      expect(rgb(findSpanOnLine(setup, /function greet\(\): string \{/, "function"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /return "hi";/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights ruby fenced code blocks", async () => {
+      const setup = await renderApp('```ruby\ndef greet\n  "hi"\nend\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" ruby");
+      expect(rgb(findSpanOnLine(setup, /def greet/, "def"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /"hi"/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights scala fenced code blocks", async () => {
+      const setup = await renderApp(
+        '```scala\nobject Hello {\n  def greet(): String = "hi"\n}\n```',
+      );
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" scala");
+      expect(rgb(findSpanOnLine(setup, /object Hello \{/, "object"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /def greet\(\): String = "hi"/, '"hi"'))).toEqual([
+        158, 206, 106,
+      ]);
+    });
+
+    test("highlights jsx fenced code blocks", async () => {
+      const setup = await renderApp('```jsx\nconst view = <Card title="hi" />;\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" javascriptreact");
+      expect(rgb(findSpanOnLine(setup, /const view = <Card title="hi" \/>;/, "const"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /const view = <Card title="hi" \/>;/, '"hi"'))).toEqual([
+        158, 206, 106,
+      ]);
+    });
+
+    test("highlights css fenced code blocks", async () => {
+      const setup = await renderApp("```css\n.hero { color: red; }\n```");
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" css");
+      expect(rgb(findSpanOnLine(setup, /\.hero \{ color: red; \}/, ".hero { color"))).toEqual([
+        192, 202, 245,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /\.hero \{ color: red; \}/, ":"))).toEqual([169, 177, 214]);
     });
 
     test("highlights tilde fenced code blocks in view mode", async () => {
@@ -267,6 +407,119 @@ describe("App", () => {
       ]);
     });
 
+    test("highlights toml fenced code blocks", async () => {
+      const setup = await renderApp('```toml\nname = "inktty"\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" toml");
+      expect(rgb(findSpanOnLine(setup, /name = "inktty"/, '"inktty"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights hcl fenced code blocks", async () => {
+      const setup = await renderApp('```hcl\nresource "aws_instance" "web" {}\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain("󱁢 hcl");
+      expect(
+        rgb(findSpanOnLine(setup, /resource "aws_instance" "web" \{\}/, '"aws_instance"')),
+      ).toEqual([158, 206, 106]);
+    });
+
+    test("highlights html fenced code blocks", async () => {
+      const setup = await renderApp('```html\n<div class="hero">hi</div>\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain("󰌝 html");
+      expect(rgb(findSpanOnLine(setup, /<div class="hero">hi<\/div>/, "div"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /<div class="hero">hi<\/div>/, "hero"))).toEqual([
+        158, 206, 106,
+      ]);
+    });
+
+    test("highlights go fenced code blocks", async () => {
+      const content = '```go\npackage main\n\nfunc greet() string {\n    return "hi"\n}\n```';
+      const setup = await renderApp(content);
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" go");
+      expect(rgb(findSpanOnLine(setup, /func greet\(\) string/, "func"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /return "hi"/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights c fenced code blocks", async () => {
+      const setup = await renderApp("```c\nint main(void) {\n  return 0;\n}\n```");
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" c");
+      expect(rgb(findSpanOnLine(setup, /return 0;/, "return"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /return 0;/, "0"))).toEqual([255, 158, 100]);
+    });
+
+    test("highlights lua fenced code blocks", async () => {
+      const setup = await renderApp('```lua\nlocal function greet()\n  return "hi"\nend\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" lua");
+      expect(rgb(findSpanOnLine(setup, /local function greet\(\)/, "function"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /return "hi"/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights kotlin fenced code blocks", async () => {
+      const setup = await renderApp(
+        '```kotlin\nfun greet(name: String): String {\n    return "hi $name"\n}\n```',
+      );
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" kotlin");
+      expect(rgb(findSpanOnLine(setup, /fun greet\(name: String\): String \{/, "fun"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /return "hi \$name"/, '"hi $name"'))).toEqual([
+        158, 206, 106,
+      ]);
+    });
+
+    test("highlights tsx fenced code blocks", async () => {
+      const setup = await renderApp('```tsx\nconst view = <Card title="hi" />\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" typescriptreact");
+      expect(rgb(findSpanOnLine(setup, /const view = <Card title="hi" \/>/, "const"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /const view = <Card title="hi" \/>/, '"hi"'))).toEqual([
+        158, 206, 106,
+      ]);
+    });
+
     test("renders nerd font icons for python fenced code blocks", async () => {
       const setup = await renderApp('```python\nprint("hi")\n```');
 
@@ -275,6 +528,35 @@ describe("App", () => {
       await setup.renderOnce();
 
       expect(await renderFrame(setup)).toContain("󰌠 python");
+      expect(rgb(findSpanOnLine(setup, /print\("hi"\)/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights rust fenced code blocks", async () => {
+      const setup = await renderApp('```rust\nfn greet() -> &\'static str {\n    "hi"\n}\n```');
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" rust");
+      expect(rgb(findSpanOnLine(setup, /fn greet\(\)/, "fn"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /"hi"/, '"hi"'))).toEqual([158, 206, 106]);
+    });
+
+    test("highlights zig fenced code blocks", async () => {
+      const content =
+        '```zig\nconst std = @import("std");\n\nfn greet() []const u8 {\n    return "hi";\n}\n```';
+      const setup = await renderApp(content);
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" zig");
+      expect(rgb(findSpanOnLine(setup, /fn greet\(\) \[\]const u8 \{/, "fn"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /return "hi";/, '"hi"'))).toEqual([158, 206, 106]);
     });
 
     test("renders mermaid fenced code blocks as glyph diagrams", async () => {

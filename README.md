@@ -2,27 +2,62 @@
 
 A simple terminal markdown reader built with OpenTUI.
 
+## Runtime Requirement
+
+`ink` requires Bun to run.
+
+`ink` runs on the Bun runtime, so Bun is required even when you invoke `ink` directly.
+
+Use Bun `>=1.0.0`.
+
 ## Usage
 
+One-time setup from this repository:
+
 ```bash
-# Install and run
 bun install
+bun link
+```
+
+Then use `ink` normally:
+
+```bash
 ink <path-to-file.md>
+```
 
-# Or run directly with bun
-bun run start -- <path-to-file.md>
+Use a specific theme:
 
-# Use a specific theme
+```bash
 ink --theme nord <path-to-file.md>
+```
 
-# List embedded and user themes
+List embedded and user themes:
+
+```bash
 ink --list-themes
+```
+
+If you prefer not to link the CLI, you can still run it directly with Bun:
+
+```bash
+bun run start -- <path-to-file.md>
+```
 
 ## Example
 
 ```bash
 ink example.md
 ```
+
+## Technical Documentation
+
+Implementation notes live in [`docs/`](docs/README.md):
+
+- [Architecture](docs/architecture.md)
+- [Themes](docs/themes.md)
+- [Testing](docs/testing.md)
+
+Theme override examples live in [`examples/themes/`](examples/themes/README.md).
 
 ## Font Requirement
 

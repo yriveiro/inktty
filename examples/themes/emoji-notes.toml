@@ -1,0 +1,58 @@
+name = "emoji-notes"
+extends = "tokyo-night"
+
+[markdown.heading.h1]
+icon = "📝"
+foreground = "#7dcfff"
+background = "#1f2335"
+
+[markdown.heading.h2]
+icon = "✨"
+foreground = "#9ece6a"
+
+[markdown.heading.h3]
+icon = "📌"
+foreground = "#e0af68"
+
+[markdown.links.github]
+icon = "🐙"
+foreground = "#7aa2f7"
+
+[markdown.links.web]
+icon = "🌐"
+foreground = "#7dcfff"
+
+[markdown.links.mail]
+icon = "✉️"
+foreground = "#9ece6a"
+
+[markdown.links.path]
+icon = "📁"
+foreground = "#2ac3de"
+
+[markdown.list]
+bullet = "👉"
+bulletForeground = "#bb9af7"
+
+[markdown.blockquote]
+marker = "💬"
+foreground = "#7aa2f7"
+border = "#7aa2f7"
+
+[markdown.callout.note]
+badge = "📝 NOTE"
+foreground = "#7aa2f7"
+border = "#7aa2f7"
+background = "#1f2335"
+
+[markdown.callout.tip]
+badge = "💡 TIP"
+foreground = "#9ece6a"
+border = "#9ece6a"
+background = "#18251c"
+
+[markdown.callout.warning]
+badge = "⚠️ WARNING"
+foreground = "#e0af68"
+border = "#e0af68"
+background = "#2a2414"

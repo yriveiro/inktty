@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "noEmit": true,
     "noFallthroughCasesInSwitch": true,
+    "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noUnusedLocals": true,
@@ -19,5 +20,5 @@
     "noPropertyAccessFromIndexSignature": false,
     "types": ["bun"]
   },
-  "include": ["src/**/*", "tests/**/*", "bin/**/*"]
+  "include": ["src/**/*", "tests/**/*", "bin/**/*", "scripts/**/*"]
 }

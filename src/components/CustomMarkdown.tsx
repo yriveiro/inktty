@@ -1,4 +1,4 @@
-import { RGBA, type TextChunk, TextTableRenderable } from "@opentui/core";
+import { type BorderSides, RGBA, type TextChunk, TextTableRenderable } from "@opentui/core";
 import { extend } from "@opentui/react";
 import type { Token, Tokens } from "marked";
 import { createElement, Fragment, type ReactNode, useEffect, useMemo, useState } from "react";
@@ -10,7 +10,7 @@ import {
   highlightCode,
   resolveFenceLanguage,
 } from "../lib/highlight";
-import { lexMarkdown } from "../lib/markdown";
+import { extractLeadingFrontmatter, lexMarkdown } from "../lib/markdown";
 import {
   hasMermaidCli,
   isMermaidFenceLanguage,
@@ -26,6 +26,8 @@ interface CustomMarkdownProps {
   theme: InkTheme;
 }
 
+type CalloutKind = keyof InkTheme["markdown"]["callout"];
+
 const mermaidActionIcon = "";
 
 let textTableRegistered = false;
@@ -35,7 +37,7 @@ if (!textTableRegistered) {
   textTableRegistered = true;
 }
 
-const calloutAliases: Record<string, keyof InkTheme["markdown"]["callout"]> = {
+const calloutAliases = {
   abstract: "info",
   attention: "warning",
   bug: "danger",
@@ -51,11 +53,38 @@ const calloutAliases: Record<string, keyof InkTheme["markdown"]["callout"]> = {
   summary: "info",
   tldr: "info",
   todo: "note",
-};
+} satisfies Record<string, CalloutKind>;
+
+function hasOwnKey<T extends object>(value: T, key: PropertyKey): key is keyof T {
+  return Object.hasOwn(value, key);
+}
+
+function isTokenType<TType extends Token["type"]>(
+  token: Token,
+  type: TType,
+): token is Extract<Token, { type: TType }> {
+  return token.type === type;
+}
+
+function createTextToken(text: string, raw = text): Tokens.Text {
+  return { type: "text", raw, text };
+}
 
 function getHeadingStyle(theme: InkTheme, depth: number) {
-  const normalizedDepth = Math.min(Math.max(depth, 1), 6) as 1 | 2 | 3 | 4 | 5 | 6;
-  return theme.markdown.heading[`h${normalizedDepth}`];
+  switch (Math.min(Math.max(depth, 1), 6)) {
+    case 1:
+      return theme.markdown.heading.h1;
+    case 2:
+      return theme.markdown.heading.h2;
+    case 3:
+      return theme.markdown.heading.h3;
+    case 4:
+      return theme.markdown.heading.h4;
+    case 5:
+      return theme.markdown.heading.h5;
+    default:
+      return theme.markdown.heading.h6;
+  }
 }
 
 function getLinkStyle(theme: InkTheme, href: string): LinkTheme {
@@ -88,7 +117,7 @@ function toInlineTokens(token: { tokens?: Token[]; text?: string; raw?: string }
   }
 
   if (typeof token.text === "string") {
-    return [{ type: "text", raw: token.raw ?? token.text, text: token.text } as Tokens.Text];
+    return [createTextToken(token.text, token.raw ?? token.text)];
   }
 
   return [];
@@ -136,6 +165,13 @@ function alignCell(text: string, width: number, align: Tokens.TableCell["align"]
 
 function createTableCell(text: string, foreground: string): TextChunk[] {
   return [{ __isChunk: true, text, fg: RGBA.fromHex(foreground) }];
+}
+
+function createBottomBorderProps(borderColor: string): {
+  border: BorderSides[];
+  borderColor: string;
+} {
+  return { border: ["bottom"], borderColor };
 }
 
 function renderInlineToken(theme: InkTheme, token: Token, key: string): ReactNode {
@@ -354,17 +390,16 @@ function parseCallout(
   }
 
   const rawType = match[1]?.toLowerCase() ?? "note";
-  const normalizedType =
-    calloutAliases[rawType] ?? (rawType as keyof InkTheme["markdown"]["callout"]);
+  const normalizedType: CalloutKind = hasOwnKey(calloutAliases, rawType)
+    ? calloutAliases[rawType]
+    : hasOwnKey(theme.markdown.callout, rawType)
+      ? rawType
+      : "note";
   const style = theme.markdown.callout[normalizedType] ?? theme.markdown.callout.note;
   const title = match[2]?.trim();
   const body = lines.slice(1).join("\n").trim();
 
-  return {
-    body,
-    style,
-    title,
-  };
+  return title === undefined ? { body, style } : { body, style, title };
 }
 
 function renderBlockquote(theme: InkTheme, token: Tokens.Blockquote, key: string) {
@@ -480,12 +515,15 @@ function CodeBlock({
   const style = theme.markdown.codeBlock;
   const mermaidActionActive = mermaidIndex !== undefined && focusedMermaidIndex === mermaidIndex;
   const mermaidActionExpanded = mermaidActionActive || isMermaidActionHovered;
+  const mermaidActionId =
+    mermaidIndex === undefined ? {} : { id: `mermaid-png-action-${mermaidIndex}` };
+  const headerSeparatorProps = style.separator ? createBottomBorderProps(style.border) : {};
   const mermaidAction =
     !isMermaid || !renderedMermaid ? null : mermaidCliAvailable ? (
       // biome-ignore lint/a11y/noStaticElementInteractions: OpenTUI uses non-DOM JSX; box is the interactive container primitive here.
       // biome-ignore lint/a11y/useKeyWithMouseEvents: OpenTUI hover interactions do not map to DOM focus semantics; keyboard selection is handled separately.
       <box
-        id={mermaidIndex === undefined ? undefined : `mermaid-png-action-${mermaidIndex}`}
+        {...mermaidActionId}
         shouldFill={false}
         onMouseOver={() => {
           setIsMermaidActionHovered(true);
@@ -522,8 +560,7 @@ function CodeBlock({
       paddingBottom={style.bottomSpacing}
       flexDirection="row"
       justifyContent="space-between"
-      border={style.separator ? ["bottom"] : undefined}
-      borderColor={style.separator ? style.border : undefined}
+      {...headerSeparatorProps}
     >
       <text selectable>
         <span fg={style.label}>{icon}</span>
@@ -538,12 +575,17 @@ function CodeBlock({
         <text selectable>{renderedMermaid}</text>
       ) : (
         <text selectable>
-          {chunks.map((chunk, i) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: chunks are static ordered syntax segments
-            <span key={i} fg={chunk.fg}>
-              {chunk.text}
-            </span>
-          ))}
+          {chunks.map((chunk, i) =>
+            chunk.fg === undefined ? (
+              // biome-ignore lint/suspicious/noArrayIndexKey: chunks are static ordered syntax segments
+              <span key={i}>{chunk.text}</span>
+            ) : (
+              // biome-ignore lint/suspicious/noArrayIndexKey: chunks are static ordered syntax segments
+              <span key={i} fg={chunk.fg}>
+                {chunk.text}
+              </span>
+            ),
+          )}
         </text>
       )}
     </box>
@@ -579,35 +621,40 @@ function renderToken(
   keyPrefix = "token",
   mermaidState: { nextIndex: number; focusedIndex?: number | null } = { nextIndex: 0 },
   onMermaidAction?: (index: number, code: string) => void,
+  syntaxStyle = createSyntaxStyle(theme),
 ): ReactNode {
   const key = `${keyPrefix}-${index}`;
 
   switch (token.type) {
     case "blockquote": {
-      return renderBlockquote(theme, token as Tokens.Blockquote, key);
+      return isTokenType(token, "blockquote") ? renderBlockquote(theme, token, key) : null;
     }
     case "code": {
       const language = token.lang || "text";
       const mermaidIndex = isMermaidFenceLanguage(resolveFenceLanguage(language))
         ? mermaidState.nextIndex++
         : undefined;
+      const codeBlockProps = {
+        code: token.text,
+        language,
+        theme,
+        ...(mermaidState.focusedIndex !== undefined
+          ? { focusedMermaidIndex: mermaidState.focusedIndex }
+          : {}),
+        ...(mermaidIndex !== undefined ? { mermaidIndex } : {}),
+        ...(onMermaidAction !== undefined ? { onMermaidAction } : {}),
+      };
 
       return (
         <box key={key} marginBottom={1}>
-          <CodeBlock
-            code={token.text}
-            focusedMermaidIndex={mermaidState.focusedIndex}
-            language={language}
-            mermaidIndex={mermaidIndex}
-            onMermaidAction={onMermaidAction}
-            theme={theme}
-          />
+          <CodeBlock {...codeBlockProps} />
         </box>
       );
     }
     case "heading": {
       const style = getHeadingStyle(theme, token.depth);
       const showIcon = style.icon.trim().length > 0;
+      const headingSeparatorProps = style.separator ? createBottomBorderProps(style.border) : {};
 
       return (
         <box
@@ -617,9 +664,8 @@ function renderToken(
           paddingX={1}
           paddingTop={style.topSpacing}
           paddingBottom={style.bottomSpacing}
-          border={style.separator ? ["bottom"] : undefined}
-          borderColor={style.separator ? style.border : undefined}
           backgroundColor={style.background}
+          {...headingSeparatorProps}
         >
           <text selectable>
             {showIcon ? (
@@ -647,7 +693,7 @@ function renderToken(
       );
     }
     case "list": {
-      return renderList(theme, token as Tokens.List, key);
+      return isTokenType(token, "list") ? renderList(theme, token, key) : null;
     }
     case "paragraph": {
       return renderParagraphTokens(theme, token.tokens ?? [], key);
@@ -656,13 +702,13 @@ function renderToken(
       return null;
     }
     case "table": {
-      return renderTable(theme, token as Tokens.Table, key);
+      return isTokenType(token, "table") ? renderTable(theme, token, key) : null;
     }
     case "text": {
       return renderParagraphTokens(theme, toInlineTokens(token), key);
     }
     default: {
-      return <markdown key={key} content={token.raw} syntaxStyle={createSyntaxStyle(theme)} />;
+      return <markdown key={key} content={token.raw} syntaxStyle={syntaxStyle} />;
     }
   }
 }
@@ -673,9 +719,10 @@ function renderBlocks(
   keyPrefix: string,
   mermaidState: { nextIndex: number; focusedIndex?: number | null } = { nextIndex: 0 },
   onMermaidAction?: (index: number, code: string) => void,
+  syntaxStyle = createSyntaxStyle(theme),
 ): ReactNode[] {
   return tokens.map((token, index) =>
-    renderToken(theme, token, index, keyPrefix, mermaidState, onMermaidAction),
+    renderToken(theme, token, index, keyPrefix, mermaidState, onMermaidAction, syntaxStyle),
   );
 }
 
@@ -685,8 +732,28 @@ export function CustomMarkdown({
   onMermaidAction,
   theme,
 }: CustomMarkdownProps) {
-  const tokens = lexMarkdown(content);
-  const mermaidState = { focusedIndex: focusedMermaidIndex, nextIndex: 0 };
+  const syntaxStyle = useMemo(() => createSyntaxStyle(theme), [theme]);
+  const { content: markdownContent, frontmatter } = useMemo(
+    () => extractLeadingFrontmatter(content),
+    [content],
+  );
+  const tokens = useMemo(() => lexMarkdown(markdownContent), [markdownContent]);
+  const mermaidState: { nextIndex: number; focusedIndex?: number | null } = { nextIndex: 0 };
 
-  return <>{renderBlocks(theme, tokens, "root", mermaidState, onMermaidAction)}</>;
+  if (focusedMermaidIndex !== undefined) {
+    mermaidState.focusedIndex = focusedMermaidIndex;
+  }
+
+  const blocks = renderBlocks(theme, tokens, "root", mermaidState, onMermaidAction, syntaxStyle);
+
+  return (
+    <>
+      {frontmatter !== null ? (
+        <box marginBottom={blocks.length > 0 ? 1 : 0}>
+          <CodeBlock code={frontmatter} language="yaml" theme={theme} />
+        </box>
+      ) : null}
+      {blocks}
+    </>
+  );
 }

@@ -43,6 +43,13 @@ export function MarkdownReader({
     scrollbox.scrollTo(targetScrollTop);
   }, [scrollRestoreRequest, scrollboxRef]);
 
+  const customMarkdownProps = {
+    content,
+    theme,
+    ...(focusedMermaidIndex !== undefined ? { focusedMermaidIndex } : {}),
+    ...(onMermaidAction !== undefined ? { onMermaidAction } : {}),
+  };
+
   return (
     <scrollbox
       id="markdown-reader-scrollbox"
@@ -54,12 +61,7 @@ export function MarkdownReader({
       viewportOptions={{ padding: 1 }}
     >
       {mode === "view" ? (
-        <CustomMarkdown
-          content={content}
-          focusedMermaidIndex={focusedMermaidIndex}
-          onMermaidAction={onMermaidAction}
-          theme={theme}
-        />
+        <CustomMarkdown {...customMarkdownProps} />
       ) : (
         <CodeModeView
           content={content}

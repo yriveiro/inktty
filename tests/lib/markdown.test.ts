@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { extractFencedCodeBlocks, extractMermaidBlocks } from "../../src/lib/markdown";
+import {
+  extractFencedCodeBlocks,
+  extractLeadingFrontmatter,
+  extractMermaidBlocks,
+} from "../../src/lib/markdown";
 
 describe("markdown utilities", () => {
   test("extracts fenced code blocks using the shared markdown lexer", () => {
@@ -56,5 +60,29 @@ describe("markdown utilities", () => {
         index: 1,
       },
     ]);
+  });
+
+  test("extracts leading yaml frontmatter from the markdown body", () => {
+    const source = [
+      "---",
+      "description: Post-execution validation subagent",
+      "mode: subagent",
+      "permissions:",
+      "  write: deny",
+      "---",
+      "# Heading",
+      "",
+      "Body",
+    ].join("\n");
+
+    expect(extractLeadingFrontmatter(source)).toEqual({
+      frontmatter: [
+        "description: Post-execution validation subagent",
+        "mode: subagent",
+        "permissions:",
+        "  write: deny",
+      ].join("\n"),
+      content: "# Heading\n\nBody",
+    });
   });
 });

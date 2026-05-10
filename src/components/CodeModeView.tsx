@@ -86,10 +86,13 @@ function renderLineSegments(
   return displaySegments.map((segment) => {
     const key = `${keyPrefix}-${offset}-${segment.text}`;
     offset += segment.text.length || 1;
+    const text = segment.text.length > 0 ? segment.text : " ";
 
-    return (
+    return segment.fg === undefined ? (
+      <span key={key}>{text}</span>
+    ) : (
       <span key={key} fg={segment.fg}>
-        {segment.text.length > 0 ? segment.text : " "}
+        {text}
       </span>
     );
   });

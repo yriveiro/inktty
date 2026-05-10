@@ -1,0 +1,28 @@
+name = "paper-terminal-contrast"
+extends = "paper-terminal"
+
+[chrome]
+controls = "#dbeafe"
+fileName = "#ffffff"
+
+[markdown.heading.h1]
+foreground = "#b8ecff"
+icon = "##"
+
+[markdown.heading.h2]
+foreground = "#c4f5d9"
+
+[markdown.codeBlock]
+borderVisible = false
+separator = false
+topSpacing = 0
+bottomSpacing = 0
+
+[markdown.inlineCode]
+background = "#0e1a21"
+foreground = "#ffe29a"
+
+[syntax]
+comment = "#8ba2b5"
+keyword = "#9bddff"
+function = "#b7f0d0"

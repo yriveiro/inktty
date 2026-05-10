@@ -70,7 +70,17 @@ function parseCliArgs(argv: string[]): ParsedCliArgs | { error: string } {
     filePath = arg;
   }
 
-  return { filePath, themeName, listThemes };
+  const parsedArgs: ParsedCliArgs = { listThemes };
+
+  if (filePath !== undefined) {
+    parsedArgs.filePath = filePath;
+  }
+
+  if (themeName !== undefined) {
+    parsedArgs.themeName = themeName;
+  }
+
+  return parsedArgs;
 }
 
 export async function runInkCli({
@@ -131,14 +141,14 @@ export async function runInkCli({
     targetFps: 30,
   });
 
-  createReactRoot(renderer).render(
-    <App
-      fileName={basename(filePath)}
-      content={content}
-      themes={themes}
-      initialThemeName={parsedArgs.themeName}
-    />,
-  );
+  const appProps = {
+    fileName: basename(filePath),
+    content,
+    themes,
+    ...(parsedArgs.themeName !== undefined ? { initialThemeName: parsedArgs.themeName } : {}),
+  };
+
+  createReactRoot(renderer).render(<App {...appProps} />);
 
   return 0;
 }

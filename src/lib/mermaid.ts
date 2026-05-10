@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { renderMermaidASCII } from "beautiful-mermaid";
+import * as z from "zod";
 
 type MermaidPngWorkerResponse =
   | { ok: true }
@@ -11,6 +12,11 @@ type MermaidPngWorkerResponse =
       error: string;
       ok: false;
     };
+
+const mermaidPngWorkerResponseSchema = z.discriminatedUnion("ok", [
+  z.strictObject({ ok: z.literal(true) }),
+  z.strictObject({ ok: z.literal(false), error: z.string().min(1) }),
+]);
 
 const mermaidPreviewOptions = {
   boxBorderPadding: 0,
@@ -22,6 +28,9 @@ const mermaidPreviewOptions = {
 const mermaidPngDir = join(tmpdir(), "inktty-mermaid-png");
 const mermaidPngWorkerUrl = new URL("./mermaid-png-worker.ts", import.meta.url);
 const mermaidPngExports = new Map<string, Promise<void>>();
+const mermaidWorkerTimeoutMs = 15_000;
+let cachedMermaidCliPath: string | null | undefined;
+let cachedMermaidCliLookup: typeof Bun.which | undefined;
 
 export function isMermaidFenceLanguage(filetype: string): boolean {
   return filetype === "mermaid";
@@ -32,7 +41,12 @@ export function renderMermaidDiagram(source: string): string {
 }
 
 function getMermaidCliPath(): string | null {
-  return Bun.which("mmdc");
+  if (cachedMermaidCliLookup !== Bun.which || cachedMermaidCliPath === undefined) {
+    cachedMermaidCliLookup = Bun.which;
+    cachedMermaidCliPath = Bun.which("mmdc");
+  }
+
+  return cachedMermaidCliPath;
 }
 
 export function hasMermaidCli(): boolean {
@@ -57,6 +71,7 @@ async function renderMermaidPngInWorker(source: string, outputPath: string): Pro
   }
 
   const worker = new Worker(mermaidPngWorkerUrl.href);
+  const timeoutSignal = AbortSignal.timeout(mermaidWorkerTimeoutMs);
 
   try {
     await new Promise<void>((resolve, reject) => {
@@ -71,25 +86,46 @@ async function renderMermaidPngInWorker(source: string, outputPath: string): Pro
         callback();
       };
 
-      worker.onmessage = (event: MessageEvent<MermaidPngWorkerResponse>) => {
+      const abortHandler = () => {
         settle(() => {
-          if (event.data.ok) {
+          reject(new Error(`Mermaid PNG export timed out after ${mermaidWorkerTimeoutMs}ms`));
+        });
+      };
+
+      timeoutSignal.addEventListener("abort", abortHandler, { once: true });
+
+      worker.onmessage = (event: MessageEvent<unknown>) => {
+        settle(() => {
+          timeoutSignal.removeEventListener("abort", abortHandler);
+
+          const parsedResponse = mermaidPngWorkerResponseSchema.safeParse(event.data);
+
+          if (!parsedResponse.success) {
+            reject(new Error("Failed to export Mermaid PNG"));
+            return;
+          }
+
+          const response: MermaidPngWorkerResponse = parsedResponse.data;
+
+          if (response.ok) {
             resolve();
             return;
           }
 
-          reject(new Error(event.data.error));
+          reject(new Error(response.error));
         });
       };
 
       worker.onerror = (event) => {
         settle(() => {
+          timeoutSignal.removeEventListener("abort", abortHandler);
           reject(event.error instanceof Error ? event.error : new Error(event.message));
         });
       };
 
       worker.onmessageerror = () => {
         settle(() => {
+          timeoutSignal.removeEventListener("abort", abortHandler);
           reject(new Error("Failed to export Mermaid PNG"));
         });
       };

@@ -1,0 +1,83 @@
+name = "paper-terminal"
+extends = "solarized-dark"
+
+[chrome]
+headerBackground = "#11212d"
+helpBackground = "#1b2f3d"
+controls = "#9fb3c8"
+fileName = "#d7e2ec"
+lineNumber = "#6c8093"
+
+[markdown.heading.h1]
+foreground = "#8ad6ff"
+background = "#163243"
+icon = "=="
+separator = true
+topSpacing = 1
+bottomSpacing = 1
+
+[markdown.heading.h2]
+foreground = "#9fe3c1"
+background = "#132833"
+icon = "--"
+separator = true
+
+[markdown.links.github]
+foreground = "#8ad6ff"
+icon = "git"
+
+[markdown.links.path]
+foreground = "#f7c97f"
+icon = "path"
+
+[markdown.callout.note]
+badge = "[TIP SHEET]"
+foreground = "#8ad6ff"
+border = "#8ad6ff"
+background = "#183240"
+
+[markdown.callout.warning]
+badge = "[WATCH OUT]"
+foreground = "#ffb86c"
+border = "#ffb86c"
+background = "#3b2b17"
+
+[markdown.codeBlock]
+background = "#101c24"
+border = "#36556b"
+headerBackground = "#152a36"
+label = "#8ad6ff"
+language = "#a8bdcf"
+borderVisible = true
+separator = true
+topSpacing = 1
+bottomSpacing = 1
+
+[markdown.inlineCode]
+background = "#132833"
+foreground = "#ffd580"
+
+[markdown.table]
+background = "#11212d"
+border = "#36556b"
+headerForeground = "#8ad6ff"
+rowForeground = "#d7e2ec"
+separatorForeground = "#6c8093"
+
+[syntax]
+default = "#d7e2ec"
+keyword = "#8ad6ff"
+string = "#a8e6cf"
+stringEscape = "#ffd580"
+number = "#ffb86c"
+comment = "#6c8093"
+function = "#9fe3c1"
+type = "#8ad6ff"
+property = "#d7e2ec"
+variable = "#d7e2ec"
+variableBuiltin = "#9fe3c1"
+operator = "#caa6ff"
+punctuation = "#9fb3c8"
+tag = "#8ad6ff"
+tagAttribute = "#ffd580"
+tagDelimiter = "#9fb3c8"

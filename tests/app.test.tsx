@@ -41,18 +41,19 @@ async function renderApp(
   height = 24,
   options: { themes?: InkTheme[]; initialThemeName?: string } = {},
 ) {
-  testSetup = await testRender(
-    <App
-      fileName={fileName}
-      content={content}
-      themes={options.themes ?? defaultThemes}
-      initialThemeName={options.initialThemeName}
-    />,
-    {
-      width,
-      height,
-    },
-  );
+  const appProps = {
+    fileName,
+    content,
+    themes: options.themes ?? defaultThemes,
+    ...(options.initialThemeName !== undefined
+      ? { initialThemeName: options.initialThemeName }
+      : {}),
+  };
+
+  testSetup = await testRender(<App {...appProps} />, {
+    width,
+    height,
+  });
 
   return testSetup;
 }

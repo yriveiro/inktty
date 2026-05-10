@@ -143,13 +143,10 @@ export interface InkTheme {
 }
 
 type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
+  [K in keyof T]?: (T[K] extends object ? DeepPartial<T[K]> : T[K]) | undefined;
 };
 
-export type ThemeOverride = DeepPartial<Omit<InkTheme, "name">> & {
-  extends?: string;
-  name?: string;
-};
+type PlainObject = Record<string, unknown>;
 
 interface ThemeSource {
   name: string;
@@ -315,17 +312,19 @@ const themeOverrideSchema = z.strictObject({
     .optional(),
 });
 
+export type ThemeOverride = z.infer<typeof themeOverrideSchema>;
+
 function formatThemeValidationError(filePath: string, error: z.ZodError): string {
   const pretty = z.prettifyError(error).trim();
   return `Invalid theme config in ${filePath}\n${pretty}`;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
+function isPlainObject(value: unknown): value is PlainObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function deepMerge<T>(base: T, patch: DeepPartial<T>): T {
-  const result = structuredClone(base) as Record<string, unknown>;
+function mergePlainObjects(base: PlainObject, patch: PlainObject): PlainObject {
+  const result = structuredClone(base);
 
   for (const [key, value] of Object.entries(patch)) {
     if (value === undefined) {
@@ -334,12 +333,14 @@ function deepMerge<T>(base: T, patch: DeepPartial<T>): T {
 
     const current = result[key];
     result[key] =
-      isPlainObject(current) && isPlainObject(value)
-        ? deepMerge(current, value as DeepPartial<typeof current>)
-        : value;
+      isPlainObject(current) && isPlainObject(value) ? mergePlainObjects(current, value) : value;
   }
 
-  return result as T;
+  return result;
+}
+
+function deepMerge<T extends object>(base: T, patch: DeepPartial<T>): T {
+  return mergePlainObjects(base as PlainObject, patch as PlainObject) as T;
 }
 
 function calloutTheme(
@@ -671,7 +672,7 @@ const solarizedDark: InkTheme = {
   },
 };
 
-const embeddedThemes = [tokyoNight, nord, solarizedDark] as const;
+const embeddedThemes = [tokyoNight, nord, solarizedDark] satisfies readonly InkTheme[];
 
 const embeddedThemeMap = new Map<string, InkTheme>(
   embeddedThemes.map((theme) => [theme.name, structuredClone(theme)]),
@@ -747,7 +748,7 @@ async function loadThemeSources({
       throw new Error(formatThemeValidationError(filePath, validated.error));
     }
 
-    const parsed = validated.data as ThemeOverride;
+    const parsed = validated.data;
     const name = parsed.name ?? basename(entry, ".toml");
 
     sources.set(name, {

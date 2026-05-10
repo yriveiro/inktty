@@ -13,6 +13,8 @@ interface AppProps {
 
 export function App({ fileName, content, themes, initialThemeName }: AppProps) {
   const { width } = useTerminalDimensions();
+  const readerControllerOptions =
+    initialThemeName === undefined ? { content, themes } : { content, themes, initialThemeName };
   const {
     activateMermaid,
     copied,
@@ -28,7 +30,7 @@ export function App({ fileName, content, themes, initialThemeName }: AppProps) {
     themeNames,
     topLine,
     horizontalOffset,
-  } = useReaderController({ content, themes, initialThemeName });
+  } = useReaderController(readerControllerOptions);
 
   const footerRight = `${copied ? "copied! | " : ""}${filePercent}% | ? Help`;
   const fullFooterLeft =

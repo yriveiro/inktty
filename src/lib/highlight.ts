@@ -335,6 +335,9 @@ const customFiletypeParsers: Parameters<TreeSitterClient["addFiletypeParser"]>[0
     },
   },
 ];
+const customFiletypeParserMap = new Map(
+  customFiletypeParsers.map((parser) => [parser.filetype, parser]),
+);
 const configuredHighlightClients = new WeakMap<TreeSitterClient, Set<string>>();
 const highlightingClientInitialization = new WeakMap<TreeSitterClient, Promise<void>>();
 const highlightCache = new Map<string, HighlightChunk[]>();
@@ -350,11 +353,19 @@ export interface HighlightChunk {
 const maxHighlightCacheEntries = 200;
 let nextSyntaxStyleId = 1;
 
+function hasOwnKey<T extends object>(value: T, key: PropertyKey): key is keyof T {
+  return Object.hasOwn(value, key);
+}
+
 function color(hex: string): RGBA {
   return RGBA.fromHex(hex);
 }
 
-const fenceLanguageAliases: Record<string, string> = {
+function createHighlightChunk(text: string, attributes: number, fg?: RGBA): HighlightChunk {
+  return fg === undefined ? { text, attributes } : { text, fg, attributes };
+}
+
+const fenceLanguageAliases = {
   bash: "bash",
   c: "c",
   "c#": "csharp",
@@ -404,7 +415,7 @@ const fenceLanguageAliases: Record<string, string> = {
   tsx: "typescriptreact",
   cplusplus: "cpp",
   "c++": "cpp",
-};
+} satisfies Record<string, string>;
 
 function buildSyntaxStyle(palette: SyntaxPalette): SyntaxStyle {
   return SyntaxStyle.fromStyles({
@@ -519,13 +530,15 @@ async function initializeHighlightingClient(client: TreeSitterClient): Promise<v
 function getCanonicalHighlightFiletype(filetype: string): string {
   const normalizedFiletype = filetype.toLowerCase();
 
-  return fenceLanguageAliases[normalizedFiletype] ?? normalizedFiletype;
+  return hasOwnKey(fenceLanguageAliases, normalizedFiletype)
+    ? fenceLanguageAliases[normalizedFiletype]
+    : normalizedFiletype;
 }
 
 function getCustomFiletypeParser(filetype: string) {
   const canonicalFiletype = getCanonicalHighlightFiletype(filetype);
 
-  return customFiletypeParsers.find((parser) => parser.filetype === canonicalFiletype);
+  return customFiletypeParserMap.get(canonicalFiletype);
 }
 
 function ensureHighlightParser(client: TreeSitterClient, filetype: string): void {
@@ -633,11 +646,9 @@ export async function highlightCode(
 
   return setCachedHighlight(
     cacheKey,
-    treeSitterToTextChunks(content, result.highlights, style).map((chunk) => ({
-      text: chunk.text,
-      fg: chunk.fg,
-      attributes: chunk.attributes ?? 0,
-    })),
+    treeSitterToTextChunks(content, result.highlights, style).map((chunk) =>
+      createHighlightChunk(chunk.text, chunk.attributes ?? 0, chunk.fg),
+    ),
   );
 }
 
@@ -653,7 +664,7 @@ export function resolveFenceLanguage(infoString?: string): string {
   }
 
   return (
-    fenceLanguageAliases[token] ??
+    (hasOwnKey(fenceLanguageAliases, token) ? fenceLanguageAliases[token] : undefined) ??
     infoStringToFiletype(trimmed) ??
     infoStringToFiletype(token) ??
     token

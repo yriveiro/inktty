@@ -2,7 +2,7 @@ interface CodeBlockMeta {
   icon: string;
 }
 
-const codeBlockMetaByFiletype: Record<string, CodeBlockMeta> = {
+const codeBlockMetaByFiletype = {
   bash: { icon: "" },
   c: { icon: "" },
   cpp: { icon: "" },
@@ -38,12 +38,18 @@ const codeBlockMetaByFiletype: Record<string, CodeBlockMeta> = {
   yml: { icon: "" },
   zig: { icon: "" },
   zsh: { icon: "" },
-};
+} satisfies Record<string, CodeBlockMeta>;
 
 const defaultCodeBlockMeta: CodeBlockMeta = {
   icon: "󰈙",
 };
 
+function hasOwnKey<T extends object>(value: T, key: PropertyKey): key is keyof T {
+  return Object.hasOwn(value, key);
+}
+
 export function getCodeBlockMeta(filetype: string): CodeBlockMeta {
-  return codeBlockMetaByFiletype[filetype] ?? defaultCodeBlockMeta;
+  return hasOwnKey(codeBlockMetaByFiletype, filetype)
+    ? codeBlockMetaByFiletype[filetype]
+    : defaultCodeBlockMeta;
 }

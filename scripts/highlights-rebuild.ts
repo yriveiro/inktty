@@ -2,27 +2,30 @@ import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import * as z from "zod";
 
-interface VendoredQuery {
-  source: string;
-  target: string;
-}
+const vendoredQuerySchema = z.strictObject({
+  source: z.string().min(1),
+  target: z.string().min(1),
+});
 
-interface VendoredGrammar {
-  name: string;
-  repository: string;
-  revision: string;
-  checkoutRef?: string;
-  generate?: boolean;
-  parserPath: string;
-  queries: VendoredQuery[];
-  notes?: string[];
-}
+const vendoredGrammarSchema = z.strictObject({
+  name: z.string().min(1),
+  repository: z.string().min(1),
+  revision: z.string().min(1),
+  checkoutRef: z.string().min(1).optional(),
+  generate: z.boolean().optional(),
+  parserPath: z.string().min(1),
+  queries: z.array(vendoredQuerySchema),
+  notes: z.array(z.string()).optional(),
+});
 
-interface VendoredManifest {
-  treeSitterCliVersion: string;
-  grammars: VendoredGrammar[];
-}
+const vendoredManifestSchema = z.strictObject({
+  treeSitterCliVersion: z.string().min(1),
+  grammars: z.array(vendoredGrammarSchema),
+});
+
+type VendoredGrammar = z.infer<typeof vendoredGrammarSchema>;
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const manifestPath = join(repoRoot, "scripts", "highlights-vendored.json");
@@ -102,7 +105,7 @@ async function buildGrammar(grammar: VendoredGrammar, cliVersion: string, worksp
 }
 
 async function main(): Promise<void> {
-  const manifest = (await Bun.file(manifestPath).json()) as VendoredManifest;
+  const manifest = vendoredManifestSchema.parse(await Bun.file(manifestPath).json());
   const workspaceRoot = await mkdtemp(join(tmpdir(), "inktty-highlights-"));
 
   try {

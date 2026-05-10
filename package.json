@@ -1,6 +1,6 @@
 {
   "name": "@yriveiro/inktty",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "description": "A simple terminal markdown reader built with OpenTUI",
   "author": "yriveiro",

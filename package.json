@@ -27,6 +27,7 @@
     "start": "bun run bin/ink.tsx",
     "dev": "bun --watch run bin/ink.tsx",
     "highlights-rebuild": "bun run scripts/highlights-rebuild.ts",
+    "web-tree-sitter-compat": "bun run scripts/web-tree-sitter-compat.ts",
     "test": "bun test",
     "test:bdd": "bun test tests/bdd",
     "lint": "biome check .",
@@ -34,6 +35,7 @@
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf bun.lock",
+    "postinstall": "bun run web-tree-sitter-compat",
     "prepublishOnly": "bun run typecheck && bun run lint",
     "prepack": "bun run typecheck && bun run lint"
   },
@@ -65,7 +67,7 @@
     "tree-sitter-rust": "^0.24.0",
     "tree-sitter-scala": "^0.24.0",
     "tree-sitter-typescript": "^0.23.2",
-    "web-tree-sitter": "0.25.10",
+    "web-tree-sitter": "0.26.8",
     "zod": "^4.4.3"
   },
   "devDependencies": {

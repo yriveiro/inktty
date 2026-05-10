@@ -133,5 +133,7 @@ assertion runs before the highlight work has settled.
 - Markdown rendering or keybinding change: run `bun test tests/app.test.tsx`
 - User-facing behavior change: run `bun test tests/bdd`
 - Vendored grammar/query refresh: run `bun run highlights-rebuild`, then `bun test`
+  and review [`highlighting.md`](highlighting.md) if the source pinning or
+  rebuild policy changed
 
 For broader refactors, run the full suite with `bun test`.

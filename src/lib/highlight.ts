@@ -335,13 +335,20 @@ const customFiletypeParsers: Parameters<TreeSitterClient["addFiletypeParser"]>[0
     },
   },
 ];
-const configuredHighlightClients = new WeakSet<TreeSitterClient>();
+const configuredHighlightClients = new WeakMap<TreeSitterClient, Set<string>>();
+const highlightingClientInitialization = new WeakMap<TreeSitterClient, Promise<void>>();
+const highlightCache = new Map<string, HighlightChunk[]>();
+const syntaxStyleCache = new WeakMap<SyntaxPalette, SyntaxStyle>();
+const syntaxStyleIds = new WeakMap<SyntaxStyle, number>();
 
 export interface HighlightChunk {
   text: string;
   fg?: RGBA;
   attributes: number;
 }
+
+const maxHighlightCacheEntries = 200;
+let nextSyntaxStyleId = 1;
 
 function color(hex: string): RGBA {
   return RGBA.fromHex(hex);
@@ -475,23 +482,72 @@ function buildSyntaxStyle(palette: SyntaxPalette): SyntaxStyle {
 }
 
 export function createSyntaxStyle(theme: InkTheme): SyntaxStyle {
-  return buildSyntaxStyle(theme.syntax);
+  const cachedStyle = syntaxStyleCache.get(theme.syntax);
+
+  if (cachedStyle) {
+    return cachedStyle;
+  }
+
+  const style = buildSyntaxStyle(theme.syntax);
+  syntaxStyleCache.set(theme.syntax, style);
+  return style;
 }
 
 export const syntaxStyle = createSyntaxStyle(defaultTheme);
 
 function getHighlightingClient(): TreeSitterClient {
-  const client = getTreeSitterClient();
+  return getTreeSitterClient();
+}
 
-  if (!configuredHighlightClients.has(client)) {
-    for (const parser of customFiletypeParsers) {
-      client.addFiletypeParser(parser);
-    }
+async function initializeHighlightingClient(client: TreeSitterClient): Promise<void> {
+  const existingInitialization = highlightingClientInitialization.get(client);
 
-    configuredHighlightClients.add(client);
+  if (existingInitialization) {
+    await existingInitialization;
+    return;
   }
 
-  return client;
+  const initialization = client.initialize().catch((error) => {
+    highlightingClientInitialization.delete(client);
+    throw error;
+  });
+
+  highlightingClientInitialization.set(client, initialization);
+  await initialization;
+}
+
+function getCanonicalHighlightFiletype(filetype: string): string {
+  const normalizedFiletype = filetype.toLowerCase();
+
+  return fenceLanguageAliases[normalizedFiletype] ?? normalizedFiletype;
+}
+
+function getCustomFiletypeParser(filetype: string) {
+  const canonicalFiletype = getCanonicalHighlightFiletype(filetype);
+
+  return customFiletypeParsers.find((parser) => parser.filetype === canonicalFiletype);
+}
+
+function ensureHighlightParser(client: TreeSitterClient, filetype: string): void {
+  const parser = getCustomFiletypeParser(filetype);
+
+  if (!parser) {
+    return;
+  }
+
+  let configuredFiletypes = configuredHighlightClients.get(client);
+
+  if (!configuredFiletypes) {
+    configuredFiletypes = new Set<string>();
+    configuredHighlightClients.set(client, configuredFiletypes);
+  }
+
+  if (configuredFiletypes.has(parser.filetype)) {
+    return;
+  }
+
+  client.addFiletypeParser(parser);
+  configuredFiletypes.add(parser.filetype);
 }
 
 function normalizeShellPlaceholder(token: string): string {
@@ -508,26 +564,81 @@ function normalizeSourceForHighlighting(content: string, filetype: string): stri
   return content.replace(/<[^<>\r\n]+>/g, normalizeShellPlaceholder);
 }
 
+function getSyntaxStyleId(style: SyntaxStyle): number {
+  const existingStyleId = syntaxStyleIds.get(style);
+
+  if (existingStyleId !== undefined) {
+    return existingStyleId;
+  }
+
+  const styleId = nextSyntaxStyleId++;
+  syntaxStyleIds.set(style, styleId);
+  return styleId;
+}
+
+function getHighlightCacheKey(content: string, filetype: string, style: SyntaxStyle): string {
+  return `${filetype}\u0000${getSyntaxStyleId(style)}\u0000${content}`;
+}
+
+function getCachedHighlight(cacheKey: string): HighlightChunk[] | undefined {
+  const cachedHighlight = highlightCache.get(cacheKey);
+
+  if (!cachedHighlight) {
+    return undefined;
+  }
+
+  highlightCache.delete(cacheKey);
+  highlightCache.set(cacheKey, cachedHighlight);
+  return cachedHighlight;
+}
+
+function setCachedHighlight(cacheKey: string, chunks: HighlightChunk[]): HighlightChunk[] {
+  highlightCache.set(cacheKey, chunks);
+
+  if (highlightCache.size > maxHighlightCacheEntries) {
+    const oldestCacheKey = highlightCache.keys().next().value;
+
+    if (oldestCacheKey !== undefined) {
+      highlightCache.delete(oldestCacheKey);
+    }
+  }
+
+  return chunks;
+}
+
 export async function highlightCode(
   content: string,
   filetype: string,
   style: SyntaxStyle = syntaxStyle,
 ): Promise<HighlightChunk[]> {
   const client = getHighlightingClient();
-  await client.initialize();
+  const canonicalFiletype = getCanonicalHighlightFiletype(filetype);
 
-  const normalizedContent = normalizeSourceForHighlighting(content, filetype);
-  const result = await client.highlightOnce(normalizedContent, filetype);
+  await initializeHighlightingClient(client);
+  ensureHighlightParser(client, canonicalFiletype);
 
-  if (!result.highlights?.length) {
-    return [{ text: content, attributes: 0 }];
+  const cacheKey = getHighlightCacheKey(content, canonicalFiletype, style);
+  const cachedHighlight = getCachedHighlight(cacheKey);
+
+  if (cachedHighlight) {
+    return cachedHighlight;
   }
 
-  return treeSitterToTextChunks(content, result.highlights, style).map((chunk) => ({
-    text: chunk.text,
-    fg: chunk.fg,
-    attributes: chunk.attributes ?? 0,
-  }));
+  const normalizedContent = normalizeSourceForHighlighting(content, canonicalFiletype);
+  const result = await client.highlightOnce(normalizedContent, canonicalFiletype);
+
+  if (!result.highlights?.length) {
+    return setCachedHighlight(cacheKey, [{ text: content, attributes: 0 }]);
+  }
+
+  return setCachedHighlight(
+    cacheKey,
+    treeSitterToTextChunks(content, result.highlights, style).map((chunk) => ({
+      text: chunk.text,
+      fg: chunk.fg,
+      attributes: chunk.attributes ?? 0,
+    })),
+  );
 }
 
 export function resolveFenceLanguage(infoString?: string): string {

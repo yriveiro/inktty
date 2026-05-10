@@ -3,12 +3,15 @@ declare var self: Worker;
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import * as z from "zod";
 
-type MermaidPngWorkerRequest = {
-  cliPath: string;
-  outputPath: string;
-  source: string;
-};
+const mermaidPngWorkerRequestSchema = z.strictObject({
+  cliPath: z.string().min(1),
+  outputPath: z.string().min(1),
+  source: z.string(),
+});
+
+type MermaidPngWorkerRequest = z.infer<typeof mermaidPngWorkerRequestSchema>;
 
 type MermaidPngWorkerResponse =
   | { ok: true }
@@ -31,6 +34,7 @@ async function renderMermaidPng(request: MermaidPngWorkerRequest): Promise<void>
       {
         stderr: "pipe",
         stdout: "ignore",
+        timeout: 12_000,
       },
     );
     const [exitCode, stderr] = await Promise.all([child.exited, new Response(child.stderr).text()]);
@@ -43,9 +47,11 @@ async function renderMermaidPng(request: MermaidPngWorkerRequest): Promise<void>
   }
 }
 
-self.onmessage = async (event: MessageEvent<MermaidPngWorkerRequest>) => {
+self.onmessage = async (event: MessageEvent<unknown>) => {
   try {
-    await renderMermaidPng(event.data);
+    const request = mermaidPngWorkerRequestSchema.parse(event.data);
+
+    await renderMermaidPng(request);
     const response: MermaidPngWorkerResponse = { ok: true };
 
     postMessage(response);

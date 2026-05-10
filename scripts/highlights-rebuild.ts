@@ -13,6 +13,7 @@ interface VendoredGrammar {
   repository: string;
   revision: string;
   checkoutRef?: string;
+  generate?: boolean;
   parserPath: string;
   queries: VendoredQuery[];
   notes?: string[];
@@ -77,6 +78,10 @@ async function buildGrammar(grammar: VendoredGrammar, cliVersion: string, worksp
 
   const parserOutputPath = join(repoRoot, grammar.parserPath);
   await mkdir(dirname(parserOutputPath), { recursive: true });
+
+  if (grammar.generate) {
+    await run(["bunx", `tree-sitter-cli@${cliVersion}`, "generate"], cloneDir);
+  }
 
   await run(
     [

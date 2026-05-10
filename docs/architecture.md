@@ -198,21 +198,25 @@ Responsibilities:
 - resolve fence aliases such as `ts` -> `typescript`, `yml` -> `yaml`, and
   `shell` -> `bash`
 - register extra parsers once per shared Tree-sitter client using a `WeakSet`
-- provide grammars for Bash, YAML, JSON, Java, and Rego
+- load both package-managed grammars and vendored parser/query assets for the
+  supported fenced languages
 - convert Tree-sitter highlight ranges into OpenTUI chunks using the current
   syntax palette
 
 Some grammars are vendored instead of package-managed.
 
-When an npm package does not ship a usable parser `.wasm` or the exact query set
-`inktty` needs, the repo stores the parser/query artifacts directly under
-`src/lib/tree-sitter-*`.
+That happens when an npm package does not ship a usable parser `.wasm`, when it
+does not include the query files `inktty` needs, or when the project must pin a
+specific upstream query source instead of relying on a moving branch.
 
 Those vendored assets are rebuilt from pinned upstream revisions by
 `scripts/highlights-rebuild.ts`, configured through
 `scripts/highlights-vendored.json`, and exposed as the contributor command:
 
 - `bun run highlights-rebuild`
+
+See [`highlighting.md`](highlighting.md) for the source policy, current pinned
+grammars, and rebuild rationale.
 
 There is one important Bash-specific normalization step.
 

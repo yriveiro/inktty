@@ -579,6 +579,7 @@ function renderToken(
   keyPrefix = "token",
   mermaidState: { nextIndex: number; focusedIndex?: number | null } = { nextIndex: 0 },
   onMermaidAction?: (index: number, code: string) => void,
+  syntaxStyle = createSyntaxStyle(theme),
 ): ReactNode {
   const key = `${keyPrefix}-${index}`;
 
@@ -662,7 +663,7 @@ function renderToken(
       return renderParagraphTokens(theme, toInlineTokens(token), key);
     }
     default: {
-      return <markdown key={key} content={token.raw} syntaxStyle={createSyntaxStyle(theme)} />;
+      return <markdown key={key} content={token.raw} syntaxStyle={syntaxStyle} />;
     }
   }
 }
@@ -673,9 +674,10 @@ function renderBlocks(
   keyPrefix: string,
   mermaidState: { nextIndex: number; focusedIndex?: number | null } = { nextIndex: 0 },
   onMermaidAction?: (index: number, code: string) => void,
+  syntaxStyle = createSyntaxStyle(theme),
 ): ReactNode[] {
   return tokens.map((token, index) =>
-    renderToken(theme, token, index, keyPrefix, mermaidState, onMermaidAction),
+    renderToken(theme, token, index, keyPrefix, mermaidState, onMermaidAction, syntaxStyle),
   );
 }
 
@@ -685,10 +687,14 @@ export function CustomMarkdown({
   onMermaidAction,
   theme,
 }: CustomMarkdownProps) {
-  const { content: markdownContent, frontmatter } = extractLeadingFrontmatter(content);
-  const tokens = lexMarkdown(markdownContent);
+  const syntaxStyle = useMemo(() => createSyntaxStyle(theme), [theme]);
+  const { content: markdownContent, frontmatter } = useMemo(
+    () => extractLeadingFrontmatter(content),
+    [content],
+  );
+  const tokens = useMemo(() => lexMarkdown(markdownContent), [markdownContent]);
   const mermaidState = { focusedIndex: focusedMermaidIndex, nextIndex: 0 };
-  const blocks = renderBlocks(theme, tokens, "root", mermaidState, onMermaidAction);
+  const blocks = renderBlocks(theme, tokens, "root", mermaidState, onMermaidAction, syntaxStyle);
 
   return (
     <>

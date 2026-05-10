@@ -72,12 +72,23 @@ inktty vendors adapted Tree-sitter highlight queries from
 Those vendored query files are used under the upstream Apache-2.0 license and
 remain attributed in the source headers.
 
+For Diff and Dockerfile, the rebuild uses the final archived
+`nvim-treesitter` commit instead of a moving branch so the query source stays
+immutable.
+
+HCL and Kotlin are also attributed to `nvim-treesitter`, but those query files
+are maintained locally because they are adapted to the npm parser packages used
+by `inktty`.
+
 inktty also vendors parser and query assets from upstream grammar repositories
 when npm packages do not ship a usable parser `.wasm` for the current loader:
 
 - `src/lib/tree-sitter-diff/tree-sitter-diff.wasm` from `the-mikedavis/tree-sitter-diff`
 - `src/lib/tree-sitter-dockerfile/tree-sitter-dockerfile.wasm` from `camdencheek/tree-sitter-dockerfile`
 - `src/lib/tree-sitter-sql/tree-sitter-sql.wasm` and `src/lib/tree-sitter-sql/highlights.scm` from `derekstride/tree-sitter-sql`
+
+The committed parser/query outputs exist so normal installs do not need local
+Tree-sitter grammar builds, Docker, or Emscripten just to run the app.
 
 The vendored assets are reproducible from pinned upstream revisions with:
 
@@ -87,6 +98,9 @@ bun run highlights-rebuild
 
 The pinned sources and rebuild configuration live in
 `scripts/highlights-vendored.json`.
+
+Contributor notes for the highlighting subsystem and rebuild workflow live in
+[`docs/highlighting.md`](docs/highlighting.md).
 
 ## Font Requirement
 

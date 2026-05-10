@@ -14,6 +14,7 @@ bun test
 bun test tests/bin
 bun test tests/lib
 bun test tests/bdd
+bun run highlights-rebuild
 bun run typecheck
 bun run lint
 ```
@@ -131,5 +132,6 @@ assertion runs before the highlight work has settled.
 - Theme resolution or validation change: run `bun test tests/lib/theme.test.ts`
 - Markdown rendering or keybinding change: run `bun test tests/app.test.tsx`
 - User-facing behavior change: run `bun test tests/bdd`
+- Vendored grammar/query refresh: run `bun run highlights-rebuild`, then `bun test`
 
 For broader refactors, run the full suite with `bun test`.

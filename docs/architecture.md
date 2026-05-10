@@ -202,6 +202,18 @@ Responsibilities:
 - convert Tree-sitter highlight ranges into OpenTUI chunks using the current
   syntax palette
 
+Some grammars are vendored instead of package-managed.
+
+When an npm package does not ship a usable parser `.wasm` or the exact query set
+`inktty` needs, the repo stores the parser/query artifacts directly under
+`src/lib/tree-sitter-*`.
+
+Those vendored assets are rebuilt from pinned upstream revisions by
+`scripts/highlights-rebuild.ts`, configured through
+`scripts/highlights-vendored.json`, and exposed as the contributor command:
+
+- `bun run highlights-rebuild`
+
 There is one important Bash-specific normalization step.
 
 Markdown docs often contain placeholders such as `<path-to-file.md>`. Bash would

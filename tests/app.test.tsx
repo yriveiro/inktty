@@ -431,6 +431,51 @@ describe("App", () => {
       ).toEqual([158, 206, 106]);
     });
 
+    test("highlights diff fenced code blocks", async () => {
+      const setup = await renderApp(
+        ["```diff", "diff --git a/file.txt b/file.txt", "+++ b/file.txt", "+hello", "```"].join(
+          "\n",
+        ),
+      );
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" diff");
+      expect(rgb(findSpanOnLine(setup, /diff --git a\/file\.txt b\/file\.txt/, "diff"))).toEqual([
+        224, 175, 104,
+      ]);
+    });
+
+    test("highlights dockerfile fenced code blocks", async () => {
+      const setup = await renderApp("```dockerfile\nFROM node:20\nEXPOSE 3000\n```");
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain("󰡨 dockerfile");
+      expect(rgb(findSpanOnLine(setup, /FROM node:20/, "FROM"))).toEqual([122, 162, 247]);
+      expect(rgb(findSpanOnLine(setup, /EXPOSE 3000/, "3000"))).toEqual([255, 158, 100]);
+    });
+
+    test("highlights sql fenced code blocks", async () => {
+      const setup = await renderApp("```sql\nSELECT name FROM users WHERE id = 1;\n```");
+
+      await renderFrame(setup);
+      await pause(100);
+      await setup.renderOnce();
+
+      expect(await renderFrame(setup)).toContain(" sql");
+      expect(rgb(findSpanOnLine(setup, /SELECT name FROM users WHERE id = 1;/, "SELECT"))).toEqual([
+        122, 162, 247,
+      ]);
+      expect(rgb(findSpanOnLine(setup, /SELECT name FROM users WHERE id = 1;/, "1"))).toEqual([
+        158, 206, 106,
+      ]);
+    });
+
     test("highlights html fenced code blocks", async () => {
       const setup = await renderApp('```html\n<div class="hero">hi</div>\n```');
 

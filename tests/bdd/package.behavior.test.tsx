@@ -150,7 +150,7 @@ describe("Package behavior", () => {
   });
 
   describe("Scenario: rendering documentation-oriented code fences", () => {
-    test("Given markdown with c, cpp, csharp, css, hcl, html, javascript, kotlin, lua, php, ruby, scala, toml, tsx, python, go, rust, and zig fences, when inktty renders the parsed view, then the blocks are shown with language labels", async () => {
+    test("Given markdown with c, cpp, csharp, css, diff, dockerfile, hcl, html, javascript, kotlin, lua, php, ruby, scala, sql, toml, tsx, python, go, rust, and zig fences, when inktty renders the parsed view, then the blocks are shown with language labels", async () => {
       const content = [
         "```c",
         "int main(void) {",
@@ -173,6 +173,15 @@ describe("Package behavior", () => {
         "",
         "```css",
         ".hero { color: red; }",
+        "```",
+        "",
+        "```diff",
+        "diff --git a/file.txt b/file.txt",
+        "+hello",
+        "```",
+        "",
+        "```dockerfile",
+        "FROM node:20",
         "```",
         "",
         "```hcl",
@@ -210,6 +219,10 @@ describe("Package behavior", () => {
         "object Hello {",
         '  def greet(): String = "hi"',
         "}",
+        "```",
+        "",
+        "```sql",
+        "SELECT name FROM users WHERE id = 1;",
         "```",
         "",
         "```kotlin",
@@ -252,13 +265,15 @@ describe("Package behavior", () => {
         "}",
         "```",
       ].join("\n");
-      const setup = await givenInkttyIsRendering(content, 90, 170);
+      const setup = await givenInkttyIsRendering(content, 90, 210);
 
       const frame = await renderFrame(setup);
       expect(frame).toContain(" c");
       expect(frame).toContain(" cpp");
       expect(frame).toContain("󰌛 csharp");
       expect(frame).toContain(" css");
+      expect(frame).toContain(" diff");
+      expect(frame).toContain("󰡨 dockerfile");
       expect(frame).toContain("󱁢 hcl");
       expect(frame).toContain("󰌝 html");
       expect(frame).toContain("󰌞 javascript");
@@ -267,6 +282,7 @@ describe("Package behavior", () => {
       expect(frame).toContain(" php");
       expect(frame).toContain(" ruby");
       expect(frame).toContain(" scala");
+      expect(frame).toContain(" sql");
       expect(frame).toContain(" toml");
       expect(frame).toContain(" typescriptreact");
       expect(frame).toContain('name = "inktty"');

@@ -1,5 +1,8 @@
-;; Minimal Kotlin highlights for the published tree-sitter-grammars parser.
-;; Vendored locally because the npm package ships WASM but not queries/highlights.scm.
+;; Adapted from nvim-treesitter's queries/kotlin/highlights.scm.
+;; Source: https://github.com/nvim-treesitter/nvim-treesitter/blob/master/queries/kotlin/highlights.scm
+;; License: Apache-2.0.
+;; Adjusted to match @tree-sitter-grammars/tree-sitter-kotlin node names and
+;; to avoid Neovim-only predicates/directives that web-tree-sitter does not use.
 
 (function_declaration
   "fun" @keyword.function
@@ -20,7 +23,7 @@
   (identifier) @variable.parameter)
 
 (class_parameter
-  (identifier) @property)
+  (identifier) @variable.member)
 
 (variable_declaration
   (identifier) @variable)
@@ -34,8 +37,9 @@
 [
   (line_comment)
   (block_comment)
-  (shebang)
 ] @comment
+
+(shebang) @keyword.directive
 
 (number_literal) @number
 (string_literal) @string
@@ -46,6 +50,9 @@
   "interface"
   "object"
   "enum"
+] @keyword.type
+
+[
   "val"
   "var"
 ] @keyword
@@ -54,20 +61,20 @@
   "if"
   "else"
   "when"
-] @conditional
+] @keyword.conditional
 
 [
   "for"
   "while"
   "do"
-] @repeat
+] @keyword.repeat
 
 [
   "try"
   "catch"
   "throw"
   "finally"
-] @exception
+] @keyword.exception
 
 [
   "="

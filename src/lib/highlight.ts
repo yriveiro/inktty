@@ -21,6 +21,18 @@ const cppHighlightQueryPath = require.resolve("tree-sitter-cpp/queries/highlight
 const cppParserWasmPath = require.resolve("tree-sitter-cpp/tree-sitter-cpp.wasm");
 const cssHighlightQueryPath = require.resolve("tree-sitter-css/queries/highlights.scm");
 const cssParserWasmPath = require.resolve("tree-sitter-css/tree-sitter-css.wasm");
+const diffHighlightQueryPath = fileURLToPath(
+  new URL("./tree-sitter-diff/highlights.scm", import.meta.url),
+);
+const diffParserWasmPath = fileURLToPath(
+  new URL("./tree-sitter-diff/tree-sitter-diff.wasm", import.meta.url),
+);
+const dockerfileHighlightQueryPath = fileURLToPath(
+  new URL("./tree-sitter-dockerfile/highlights.scm", import.meta.url),
+);
+const dockerfileParserWasmPath = fileURLToPath(
+  new URL("./tree-sitter-dockerfile/tree-sitter-dockerfile.wasm", import.meta.url),
+);
 const yamlHighlightQueryPath = require.resolve(
   "@tree-sitter-grammars/tree-sitter-yaml/queries/highlights.scm",
 );
@@ -78,6 +90,12 @@ const rustHighlightQueryPath = require.resolve("tree-sitter-rust/queries/highlig
 const rustParserWasmPath = require.resolve("tree-sitter-rust/tree-sitter-rust.wasm");
 const scalaHighlightQueryPath = require.resolve("tree-sitter-scala/queries/highlights.scm");
 const scalaParserWasmPath = require.resolve("tree-sitter-scala/tree-sitter-scala.wasm");
+const sqlHighlightQueryPath = fileURLToPath(
+  new URL("./tree-sitter-sql/highlights.scm", import.meta.url),
+);
+const sqlParserWasmPath = fileURLToPath(
+  new URL("./tree-sitter-sql/tree-sitter-sql.wasm", import.meta.url),
+);
 const typescriptHighlightQueryPath = require.resolve(
   "tree-sitter-typescript/queries/highlights.scm",
 );
@@ -136,6 +154,21 @@ const customFiletypeParsers: Parameters<TreeSitterClient["addFiletypeParser"]>[0
     wasm: cssParserWasmPath,
     queries: {
       highlights: [cssHighlightQueryPath],
+    },
+  },
+  {
+    filetype: "diff",
+    wasm: diffParserWasmPath,
+    queries: {
+      highlights: [diffHighlightQueryPath],
+    },
+  },
+  {
+    filetype: "dockerfile",
+    aliases: ["docker"],
+    wasm: dockerfileParserWasmPath,
+    queries: {
+      highlights: [dockerfileHighlightQueryPath],
     },
   },
   {
@@ -261,6 +294,13 @@ const customFiletypeParsers: Parameters<TreeSitterClient["addFiletypeParser"]>[0
     },
   },
   {
+    filetype: "sql",
+    wasm: sqlParserWasmPath,
+    queries: {
+      highlights: [sqlHighlightQueryPath],
+    },
+  },
+  {
     filetype: "typescript",
     aliases: ["ts"],
     wasm: typescriptParserWasmPath,
@@ -315,6 +355,9 @@ const fenceLanguageAliases: Record<string, string> = {
   cs: "csharp",
   cpp: "cpp",
   css: "css",
+  diff: "diff",
+  docker: "dockerfile",
+  dockerfile: "dockerfile",
   shell: "bash",
   sh: "bash",
   zsh: "bash",
@@ -337,6 +380,7 @@ const fenceLanguageAliases: Record<string, string> = {
   rust: "rust",
   scala: "scala",
   sc: "scala",
+  sql: "sql",
   terraform: "hcl",
   tf: "hcl",
   tfvars: "hcl",
@@ -358,18 +402,54 @@ const fenceLanguageAliases: Record<string, string> = {
 function buildSyntaxStyle(palette: SyntaxPalette): SyntaxStyle {
   return SyntaxStyle.fromStyles({
     default: { fg: color(palette.default) },
+    attribute: { fg: color(palette.property) },
+    "attribute.builtin": { fg: color(palette.property) },
+    boolean: { fg: color(palette.number) },
+    conditional: { fg: color(palette.keyword), bold: true },
+    character: { fg: color(palette.string) },
+    "character.special": { fg: color(palette.stringEscape) },
+    "diff.delta": { fg: color(palette.keyword), bold: true },
+    "diff.minus": { fg: color(palette.number) },
+    "diff.plus": { fg: color(palette.string) },
     keyword: { fg: color(palette.keyword), bold: true },
+    "keyword.conditional": { fg: color(palette.keyword), bold: true },
+    "keyword.coroutine": { fg: color(palette.keyword), bold: true },
+    "keyword.directive": { fg: color(palette.keyword), bold: true },
+    "keyword.directive.define": { fg: color(palette.keyword), bold: true },
+    "keyword.exception": { fg: color(palette.keyword), bold: true },
     "keyword.function": { fg: color(palette.keyword), bold: true },
+    "keyword.import": { fg: color(palette.keyword), bold: true },
+    "keyword.modifier": { fg: color(palette.keyword), bold: true },
     "keyword.operator": { fg: color(palette.keyword), bold: true },
+    "keyword.repeat": { fg: color(palette.keyword), bold: true },
+    "keyword.return": { fg: color(palette.keyword), bold: true },
+    "keyword.type": { fg: color(palette.keyword), bold: true },
+    constructor: { fg: color(palette.function) },
+    label: { fg: color(palette.type) },
+    module: { fg: color(palette.type) },
+    "module.builtin": { fg: color(palette.type) },
     string: { fg: color(palette.string) },
+    "string.documentation": { fg: color(palette.string) },
     "string.escape": { fg: color(palette.stringEscape) },
+    "string.regexp": { fg: color(palette.string) },
     "string.special": { fg: color(palette.string) },
+    "string.special.path": { fg: color(palette.string) },
+    "string.special.symbol": { fg: color(palette.string) },
+    "string.special.url": { fg: color(palette.string) },
     number: { fg: color(palette.number) },
+    "number.float": { fg: color(palette.number) },
     constant: { fg: color(palette.number) },
     "constant.builtin": { fg: color(palette.number) },
+    "constant.macro": { fg: color(palette.number) },
     comment: { fg: color(palette.comment), italic: true },
+    "comment.documentation": { fg: color(palette.comment), italic: true },
+    "comment.error": { fg: color(palette.comment), italic: true },
+    "comment.note": { fg: color(palette.comment), italic: true },
+    "comment.todo": { fg: color(palette.comment), italic: true },
+    "comment.warning": { fg: color(palette.comment), italic: true },
     function: { fg: color(palette.function) },
     "function.call": { fg: color(palette.function) },
+    "function.macro": { fg: color(palette.function) },
     "function.method": { fg: color(palette.function) },
     "function.method.call": { fg: color(palette.function) },
     "function.builtin": { fg: color(palette.function) },
@@ -386,7 +466,9 @@ function buildSyntaxStyle(palette: SyntaxPalette): SyntaxStyle {
     punctuation: { fg: color(palette.punctuation) },
     "punctuation.bracket": { fg: color(palette.punctuation) },
     "punctuation.delimiter": { fg: color(palette.punctuation) },
+    "punctuation.special": { fg: color(palette.punctuation) },
     tag: { fg: color(palette.tag) },
+    "tag.builtin": { fg: color(palette.tag) },
     "tag.attribute": { fg: color(palette.tagAttribute) },
     "tag.delimiter": { fg: color(palette.tagDelimiter) },
   });

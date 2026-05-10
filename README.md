@@ -59,6 +59,35 @@ Implementation notes live in [`docs/`](docs/README.md):
 
 Theme override examples live in [`examples/themes/`](examples/themes/README.md).
 
+## Attribution
+
+inktty vendors adapted Tree-sitter highlight queries from
+[`nvim-treesitter`](https://github.com/nvim-treesitter/nvim-treesitter) for:
+
+- `src/lib/tree-sitter-hcl/highlights.scm`
+- `src/lib/tree-sitter-kotlin/highlights.scm`
+- `src/lib/tree-sitter-diff/highlights.scm`
+- `src/lib/tree-sitter-dockerfile/highlights.scm`
+
+Those vendored query files are used under the upstream Apache-2.0 license and
+remain attributed in the source headers.
+
+inktty also vendors parser and query assets from upstream grammar repositories
+when npm packages do not ship a usable parser `.wasm` for the current loader:
+
+- `src/lib/tree-sitter-diff/tree-sitter-diff.wasm` from `the-mikedavis/tree-sitter-diff`
+- `src/lib/tree-sitter-dockerfile/tree-sitter-dockerfile.wasm` from `camdencheek/tree-sitter-dockerfile`
+- `src/lib/tree-sitter-sql/tree-sitter-sql.wasm` and `src/lib/tree-sitter-sql/highlights.scm` from `derekstride/tree-sitter-sql`
+
+The vendored assets are reproducible from pinned upstream revisions with:
+
+```bash
+bun run highlights-rebuild
+```
+
+The pinned sources and rebuild configuration live in
+`scripts/highlights-vendored.json`.
+
 ## Font Requirement
 
 inktty assumes a patched Nerd Font in your terminal.

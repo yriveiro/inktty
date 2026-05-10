@@ -72,12 +72,26 @@ describe("highlight", () => {
     expect(resolveFenceLanguage("html")).toBe("html");
   });
 
+  test("resolves diff, dockerfile, and sql fence languages", () => {
+    expect(resolveFenceLanguage("diff")).toBe("diff");
+    expect(resolveFenceLanguage("docker")).toBe("dockerfile");
+    expect(resolveFenceLanguage("dockerfile")).toBe("dockerfile");
+    expect(resolveFenceLanguage("sql")).toBe("sql");
+  });
+
   test("covers concrete grammar scopes", () => {
+    expect(syntaxStyle.getStyle("attribute")).toBeDefined();
+    expect(syntaxStyle.getStyle("boolean")).toBeDefined();
+    expect(syntaxStyle.getStyle("keyword.conditional")).toBeDefined();
+    expect(syntaxStyle.getStyle("diff.plus")).toBeDefined();
     expect(syntaxStyle.getStyle("keyword.function")).toBeDefined();
+    expect(syntaxStyle.getStyle("keyword.return")).toBeDefined();
+    expect(syntaxStyle.getStyle("number.float")).toBeDefined();
     expect(syntaxStyle.getStyle("type.builtin")).toBeDefined();
     expect(syntaxStyle.getStyle("function.method.call")).toBeDefined();
     expect(syntaxStyle.getStyle("variable.builtin")).toBeDefined();
     expect(syntaxStyle.getStyle("punctuation.delimiter")).toBeDefined();
+    expect(syntaxStyle.getStyle("punctuation.special")).toBeDefined();
   });
 
   test("registers a bash parser for syntax highlighting", async () => {
@@ -267,6 +281,55 @@ describe("highlight", () => {
     ).toEqual([158, 206, 106]);
   });
 
+  test("registers diff, dockerfile, and sql parsers for syntax highlighting", async () => {
+    const diffChunks = await highlightCode(
+      ["diff --git a/file.txt b/file.txt", "+++ b/file.txt", "+hello", "-bye"].join("\n"),
+      "diff",
+    );
+    const dockerfileChunks = await highlightCode(
+      ["FROM node:20", "EXPOSE 3000"].join("\n"),
+      "dockerfile",
+    );
+    const sqlChunks = await highlightCode("SELECT name FROM users WHERE id = 1;", "sql");
+
+    expect(
+      diffChunks
+        .find((chunk: HighlightChunk) => chunk.text.includes("hello"))
+        ?.fg?.toInts()
+        .slice(0, 3),
+    ).toEqual([158, 206, 106]);
+    expect(
+      diffChunks
+        .find((chunk: HighlightChunk) => chunk.text.includes("bye"))
+        ?.fg?.toInts()
+        .slice(0, 3),
+    ).toEqual([255, 158, 100]);
+    expect(
+      dockerfileChunks
+        .find((chunk: HighlightChunk) => chunk.text === "FROM")
+        ?.fg?.toInts()
+        .slice(0, 3),
+    ).toEqual([122, 162, 247]);
+    expect(
+      dockerfileChunks
+        .find((chunk: HighlightChunk) => chunk.text === "3000")
+        ?.fg?.toInts()
+        .slice(0, 3),
+    ).toEqual([255, 158, 100]);
+    expect(
+      sqlChunks
+        .find((chunk: HighlightChunk) => chunk.text === "SELECT")
+        ?.fg?.toInts()
+        .slice(0, 3),
+    ).toEqual([122, 162, 247]);
+    expect(
+      sqlChunks
+        .find((chunk: HighlightChunk) => chunk.text === "1")
+        ?.fg?.toInts()
+        .slice(0, 3),
+    ).toEqual([158, 206, 106]);
+  });
+
   test("registers c, lua, and zig parsers for syntax highlighting", async () => {
     const cChunks = await highlightCode("int main(void) {\n  return 0;\n}", "c");
     const luaChunks = await highlightCode('local function greet()\n  return "hi"\nend', "lua");
@@ -322,6 +385,12 @@ describe("highlight", () => {
     expect(
       kotlinChunks
         .find((chunk: HighlightChunk) => chunk.text === "fun")
+        ?.fg?.toInts()
+        .slice(0, 3),
+    ).toEqual([122, 162, 247]);
+    expect(
+      kotlinChunks
+        .find((chunk: HighlightChunk) => chunk.text === "return")
         ?.fg?.toInts()
         .slice(0, 3),
     ).toEqual([122, 162, 247]);
